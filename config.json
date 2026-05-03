@@ -1,5 +1,6 @@
 {
   "enabled": true,
+  "notification_sound": "Default",
   "rules": [
     {
       "name": "example-literal",
