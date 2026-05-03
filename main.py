@@ -1,0 +1,217 @@
+"""
+メインアプリケーション
+
+システムトレイに常駐し、Ctrl+V でクリップボード変換を実行する。
+"""
+
+import sys
+import logging
+from pathlib import Path
+from PIL import Image, ImageDraw
+import pystray
+from pystray import MenuItem as item
+import threading
+
+from config import Config
+from transformer import Transformer
+from clipboard_util import get_text, set_text, has_text
+from hook import KeyboardHook
+
+# Windows通知用
+try:
+    from winotify import Notification, audio
+    NOTIFICATION_AVAILABLE = True
+except ImportError:
+    NOTIFICATION_AVAILABLE = False
+    logger = logging.getLogger(__name__)
+    logger.warning("winotify not available, notifications will be disabled")
+
+
+# ログ設定
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('clipboard-transformer.log', encoding='utf-8'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+logger = logging.getLogger(__name__)
+
+
+class ClipboardTransformerApp:
+    """クリップボード変換アプリケーションのメインクラス"""
+    
+    def __init__(self):
+        self.config = Config()
+        self.transformer = Transformer()
+        self.hook = KeyboardHook(on_paste_callback=self._on_paste_detected)
+        self.icon = None
+        
+        # 設定からルールをロード
+        self._reload_rules()
+    
+    def _reload_rules(self):
+        """設定ファイルからルールを再読み込み"""
+        try:
+            self.transformer.load_rules_from_config(self.config.get_rules())
+            logger.info(f"Loaded {len(self.transformer.rules)} transformation rules")
+        except Exception as e:
+            logger.error(f"Failed to load rules: {e}")
+    
+    def _on_paste_detected(self) -> bool:
+        """
+        Ctrl+V 検知時のコールバック
+        
+        Returns:
+            bool: 変換を実行した場合 True（元の Ctrl+V をブロック）
+        """
+        # 機能が無効の場合はスキップ
+        if not self.config.is_enabled():
+            logger.debug("Transformation disabled, skipping")
+            return False
+        
+        # クリップボードにテキストが無い場合はスキップ
+        if not has_text():
+            logger.debug("No text in clipboard, skipping")
+            return False
+        
+        # クリップボードからテキストを取得
+        original_text = get_text()
+        if not original_text:
+            logger.debug("Empty clipboard text, skipping")
+            return False
+        
+        # 変換を実行
+        transformed_text = self.transformer.transform(original_text)
+        
+        # 変換結果が元のテキストと同じ場合はスキップ
+        if transformed_text == original_text:
+            logger.debug("No transformation applied, skipping")
+            return False
+        
+        # 変換後のテキストをクリップボードにセット
+        if not set_text(transformed_text):
+            logger.error("Failed to set transformed text to clipboard")
+            return False
+        
+        logger.info("Text transformed and pasted")
+        
+        # Windows 通知を表示
+        try:
+            if NOTIFICATION_AVAILABLE:
+                toast = Notification(
+                    app_id="Clipboard Transformer",
+                    title="変換完了",
+                    msg="テキストが変換されました",
+                    duration="short"
+                )
+                toast.set_audio(audio.Default, loop=False)
+                toast.show()
+                logger.debug("Notification sent")
+        except Exception as e:
+            logger.error(f"Failed to show notification: {e}")
+        
+        # Ctrl+V をシミュレート
+        self.hook.simulate_paste()
+        
+        return True
+    
+    def _create_icon_image(self):
+        """システムトレイアイコン用の画像を生成"""
+        # シンプルな 64x64 のアイコンを作成
+        width = 64
+        height = 64
+        image = Image.new('RGB', (width, height), color='white')
+        draw = ImageDraw.Draw(image)
+        
+        # 背景を緑色に
+        draw.rectangle([0, 0, width, height], fill='green')
+        
+        # "CT" の文字を描画（Clipboard Transformer）
+        draw.text((10, 20), "CT", fill='white')
+        
+        return image
+    
+    def _on_toggle(self, icon, item):
+        """有効/無効の切り替え"""
+        self.config.enabled = not self.config.enabled
+        self.hook.set_enabled(self.config.enabled)
+        status = "enabled" if self.config.enabled else "disabled"
+        logger.info(f"Transformation {status}")
+        icon.notify(f"Clipboard Transformer {status}", "Status Changed")
+        # アイコンのメニューを更新
+        icon.update_menu()
+    
+    def _on_reload(self, icon, item):
+        """設定の再読み込み"""
+        logger.info("Reloading configuration...")
+        self.config.reload()
+        self._reload_rules()
+        self.hook.set_enabled(self.config.is_enabled())
+        icon.notify("Configuration reloaded", "Clipboard Transformer")
+    
+    def _on_quit(self, icon, item):
+        """アプリケーションの終了"""
+        logger.info("Quitting application...")
+        icon.stop()
+        self.hook.stop()
+    
+    def _get_menu_items(self):
+        """システムトレイのメニュー項目を生成"""
+        return (
+            item(
+                lambda text: f"{'Disable' if self.config.enabled else 'Enable'} Transformation",
+                self._on_toggle
+            ),
+            item('Reload Config', self._on_reload),
+            item('Quit', self._on_quit)
+        )
+    
+    def run(self):
+        """アプリケーションを起動"""
+        logger.info("Starting Clipboard Transformer...")
+        
+        # 設定ファイルが無い場合はサンプルを作成
+        if not Path("config.json").exists():
+            logger.info("Config file not found, creating sample config...")
+            self.config.save_default_config()
+            self.config.reload()
+            self._reload_rules()
+        
+        # キーボードフックを開始
+        self.hook.start()
+        
+        # システムトレイアイコンを作成
+        icon_image = self._create_icon_image()
+        self.icon = pystray.Icon(
+            "clipboard_transformer",
+            icon_image,
+            "Clipboard Transformer",
+            menu=pystray.Menu(self._get_menu_items)
+        )
+        
+        logger.info("Application started successfully")
+        
+        # アイコンを表示（これがメインループになる）
+        self.icon.run()
+        
+        logger.info("Application stopped")
+
+
+def main():
+    """エントリポイント"""
+    try:
+        app = ClipboardTransformerApp()
+        app.run()
+    except KeyboardInterrupt:
+        logger.info("Interrupted by user")
+        sys.exit(0)
+    except Exception as e:
+        logger.exception(f"Fatal error: {e}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
