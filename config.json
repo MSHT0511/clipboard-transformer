@@ -1,0 +1,27 @@
+{
+  "enabled": true,
+  "rules": [
+    {
+      "name": "example-literal",
+      "type": "literal",
+      "from": "旧文字列",
+      "to": "新文字列",
+      "enabled": true
+    },
+    {
+      "name": "remove-dates",
+      "type": "regex",
+      "pattern": "\\d{4}-\\d{2}-\\d{2}",
+      "replacement": "DATE_REMOVED",
+      "enabled": true
+    }
+    ,
+    {
+      "name": "fixup-x-com",
+      "type": "regex",
+      "pattern": "https://x.com",
+      "replacement": "https://fixupx.com",
+      "enabled": true
+    }
+  ]
+}
