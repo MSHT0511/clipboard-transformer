@@ -42,16 +42,16 @@ logger = logging.getLogger(__name__)
 
 class ClipboardTransformerApp:
     """クリップボード変換アプリケーションのメインクラス"""
-    
+
     def __init__(self):
         self.config = Config()
         self.transformer = Transformer()
         self.hook = KeyboardHook(on_paste_callback=self._on_paste_detected)
         self.icon = None
-        
+
         # 設定からルールをロード
         self._reload_rules()
-    
+
     def _reload_rules(self):
         """設定ファイルからルールを再読み込み"""
         try:
@@ -59,11 +59,11 @@ class ClipboardTransformerApp:
             logger.info(f"Loaded {len(self.transformer.rules)} transformation rules")
         except Exception as e:
             logger.error(f"Failed to load rules: {e}")
-    
+
     def _on_paste_detected(self) -> bool:
         """
         Ctrl+V 検知時のコールバック
-        
+
         Returns:
             bool: 変換を実行した場合 True（元の Ctrl+V をブロック）
         """
@@ -71,33 +71,33 @@ class ClipboardTransformerApp:
         if not self.config.is_enabled():
             logger.debug("Transformation disabled, skipping")
             return False
-        
+
         # クリップボードにテキストが無い場合はスキップ
         if not has_text():
             logger.debug("No text in clipboard, skipping")
             return False
-        
+
         # クリップボードからテキストを取得
         original_text = get_text()
         if not original_text:
             logger.debug("Empty clipboard text, skipping")
             return False
-        
+
         # 変換を実行
         transformed_text = self.transformer.transform(original_text)
-        
+
         # 変換結果が元のテキストと同じ場合はスキップ
         if transformed_text == original_text:
             logger.debug("No transformation applied, skipping")
             return False
-        
+
         # 変換後のテキストをクリップボードにセット
         if not set_text(transformed_text):
             logger.error("Failed to set transformed text to clipboard")
             return False
-        
+
         logger.info("Text transformed and pasted")
-        
+
         # Windows 通知を表示
         try:
             if NOTIFICATION_AVAILABLE:
@@ -107,17 +107,17 @@ class ClipboardTransformerApp:
                     msg="テキストが変換されました",
                     duration="short"
                 )
-                toast.set_audio(audio.Default, loop=False)
+                toast.set_audio(self._get_audio_sound(), loop=False)
                 toast.show()
                 logger.debug("Notification sent")
         except Exception as e:
             logger.error(f"Failed to show notification: {e}")
-        
+
         # Ctrl+V をシミュレート
         self.hook.simulate_paste()
-        
+
         return True
-    
+
     def _create_icon_image(self):
         """システムトレイアイコン用の画像を生成"""
         # シンプルな 64x64 のアイコンを作成
@@ -125,15 +125,15 @@ class ClipboardTransformerApp:
         height = 64
         image = Image.new('RGB', (width, height), color='white')
         draw = ImageDraw.Draw(image)
-        
+
         # 背景を緑色に
         draw.rectangle([0, 0, width, height], fill='green')
-        
+
         # "CT" の文字を描画（Clipboard Transformer）
         draw.text((10, 20), "CT", fill='white')
-        
+
         return image
-    
+
     def _on_toggle(self, icon, item):
         """有効/無効の切り替え"""
         self.config.enabled = not self.config.enabled
@@ -143,7 +143,25 @@ class ClipboardTransformerApp:
         icon.notify(f"Clipboard Transformer {status}", "Status Changed")
         # アイコンのメニューを更新
         icon.update_menu()
-    
+    def _get_audio_sound(self):
+        """設定された通知音の audio オブジェクトを返す"""
+        sound_name = self.config.notification_sound
+        return getattr(audio, sound_name, audio.Default)
+
+    def _on_sound_selected(self, sound_name):
+        """通知音が選択された時のハンドラを返す"""
+        def handler(icon, item):
+            self.config.notification_sound = sound_name
+            self.config.save()
+            logger.info(f"Notification sound changed to: {sound_name}")
+            icon.update_menu()
+        return handler
+
+    def _is_sound_checked(self, sound_name):
+        """通知音が選択中かどうかを返す"""
+        def checker(item):
+            return self.config.notification_sound == sound_name
+        return checker
     def _on_reload(self, icon, item):
         """設定の再読み込み"""
         logger.info("Reloading configuration...")
@@ -151,38 +169,51 @@ class ClipboardTransformerApp:
         self._reload_rules()
         self.hook.set_enabled(self.config.is_enabled())
         icon.notify("Configuration reloaded", "Clipboard Transformer")
-    
+
     def _on_quit(self, icon, item):
         """アプリケーションの終了"""
         logger.info("Quitting application...")
         icon.stop()
         self.hook.stop()
-    
+
     def _get_menu_items(self):
         """システムトレイのメニュー項目を生成"""
+        sound_menu = pystray.Menu(
+            *[
+                item(
+                    sound_name,
+                    self._on_sound_selected(sound_name),
+                    checked=self._is_sound_checked(sound_name),
+                    radio=True
+                )
+                for sound_name in Config.VALID_SOUNDS
+            ]
+        )
+
         return (
             item(
                 lambda text: f"{'Disable' if self.config.enabled else 'Enable'} Transformation",
                 self._on_toggle
             ),
+            item('Notification Sound', sound_menu),
             item('Reload Config', self._on_reload),
             item('Quit', self._on_quit)
         )
-    
+
     def run(self):
         """アプリケーションを起動"""
         logger.info("Starting Clipboard Transformer...")
-        
+
         # 設定ファイルが無い場合はサンプルを作成
         if not Path("config.json").exists():
             logger.info("Config file not found, creating sample config...")
             self.config.save_default_config()
             self.config.reload()
             self._reload_rules()
-        
+
         # キーボードフックを開始
         self.hook.start()
-        
+
         # システムトレイアイコンを作成
         icon_image = self._create_icon_image()
         self.icon = pystray.Icon(
@@ -191,12 +222,12 @@ class ClipboardTransformerApp:
             "Clipboard Transformer",
             menu=pystray.Menu(self._get_menu_items)
         )
-        
+
         logger.info("Application started successfully")
-        
+
         # アイコンを表示（これがメインループになる）
         self.icon.run()
-        
+
         logger.info("Application stopped")
 
 

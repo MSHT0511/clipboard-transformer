@@ -11,32 +11,32 @@ from transformer import Transformer
 
 class TestConfig:
     """Config クラスのテスト"""
-    
+
     def test_load_default_config(self):
         """デフォルト設定ファイルの読み込み"""
         config = Config()
         assert isinstance(config.is_enabled(), bool)
         assert isinstance(config.get_rules(), list)
-    
+
     def test_nonexistent_config_file(self):
         """存在しない設定ファイルはデフォルト設定を使用"""
         config = Config("nonexistent_test_config.json")
         assert len(config.get_rules()) == 0
         assert config.is_enabled() is True
-    
+
     def test_invalid_json(self):
         """不正なJSONファイルはデフォルト設定にフォールバック"""
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
             f.write("{invalid json")
             temp_file = f.name
-        
+
         try:
             config = Config(temp_file)
             assert len(config.get_rules()) == 0
             assert config.is_enabled() is True
         finally:
             os.unlink(temp_file)
-    
+
     def test_valid_literal_rule(self):
         """有効なliteralルールの読み込み"""
         config_data = {
@@ -51,11 +51,11 @@ class TestConfig:
                 }
             ]
         }
-        
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
             json.dump(config_data, f)
             temp_file = f.name
-        
+
         try:
             config = Config(temp_file)
             assert len(config.get_rules()) == 1
@@ -63,7 +63,7 @@ class TestConfig:
             assert config.get_rules()[0]["type"] == "literal"
         finally:
             os.unlink(temp_file)
-    
+
     def test_valid_regex_rule(self):
         """有効なregexルールの読み込み"""
         config_data = {
@@ -78,18 +78,18 @@ class TestConfig:
                 }
             ]
         }
-        
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
             json.dump(config_data, f)
             temp_file = f.name
-        
+
         try:
             config = Config(temp_file)
             assert len(config.get_rules()) == 1
             assert config.get_rules()[0]["type"] == "regex"
         finally:
             os.unlink(temp_file)
-    
+
     def test_invalid_rule_type(self):
         """無効なルールタイプはスキップされる"""
         config_data = {
@@ -98,17 +98,17 @@ class TestConfig:
                 {"name": "invalid", "type": "unknown", "from": "a", "to": "b"}
             ]
         }
-        
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
             json.dump(config_data, f)
             temp_file = f.name
-        
+
         try:
             config = Config(temp_file)
             assert len(config.get_rules()) == 0
         finally:
             os.unlink(temp_file)
-    
+
     def test_missing_required_fields_literal(self):
         """literalルールの必須フィールド欠如"""
         config_data = {
@@ -117,17 +117,17 @@ class TestConfig:
                 {"name": "incomplete", "type": "literal", "from": "a"}  # 'to' がない
             ]
         }
-        
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
             json.dump(config_data, f)
             temp_file = f.name
-        
+
         try:
             config = Config(temp_file)
             assert len(config.get_rules()) == 0
         finally:
             os.unlink(temp_file)
-    
+
     def test_missing_required_fields_regex(self):
         """regexルールの必須フィールド欠如"""
         config_data = {
@@ -136,33 +136,33 @@ class TestConfig:
                 {"name": "incomplete", "type": "regex", "pattern": r"\d+"}  # 'replacement' がない
             ]
         }
-        
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
             json.dump(config_data, f)
             temp_file = f.name
-        
+
         try:
             config = Config(temp_file)
             assert len(config.get_rules()) == 0
         finally:
             os.unlink(temp_file)
-    
+
     def test_save_default_config(self):
         """デフォルト設定ファイルの作成"""
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
             temp_file = f.name
-        
+
         os.unlink(temp_file)  # 一旦削除
-        
+
         try:
             config = Config(temp_file)
             assert config.save_default_config() is True
             assert Path(temp_file).exists()
-            
+
             # 保存されたファイルを読み込んで検証
             with open(temp_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-            
+
             assert "enabled" in data
             assert "rules" in data
             assert isinstance(data["rules"], list)
@@ -170,10 +170,130 @@ class TestConfig:
             if Path(temp_file).exists():
                 os.unlink(temp_file)
 
+    def test_notification_sound_default(self):
+        """notification_sound のデフォルト値"""
+        config = Config("nonexistent_test_config.json")
+        assert config.notification_sound == "Default"
+
+    def test_notification_sound_valid(self):
+        """有効な notification_sound の読み込み"""
+        config_data = {
+            "enabled": True,
+            "notification_sound": "Mail",
+            "rules": []
+        }
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
+            json.dump(config_data, f)
+            temp_file = f.name
+
+        try:
+            config = Config(temp_file)
+            assert config.notification_sound == "Mail"
+        finally:
+            os.unlink(temp_file)
+
+    def test_notification_sound_invalid(self):
+        """無効な notification_sound はデフォルトにフォールバック"""
+        config_data = {
+            "enabled": True,
+            "notification_sound": "InvalidSound",
+            "rules": []
+        }
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
+            json.dump(config_data, f)
+            temp_file = f.name
+
+        try:
+            config = Config(temp_file)
+            assert config.notification_sound == "Default"
+        finally:
+            os.unlink(temp_file)
+
+    def test_notification_sound_all_valid_sounds(self):
+        """すべての有効な通知音を読み込めることを確認"""
+        for sound in Config.VALID_SOUNDS:
+            config_data = {
+                "enabled": True,
+                "notification_sound": sound,
+                "rules": []
+            }
+
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
+                json.dump(config_data, f)
+                temp_file = f.name
+
+            try:
+                config = Config(temp_file)
+                assert config.notification_sound == sound
+            finally:
+                os.unlink(temp_file)
+
+    def test_config_save(self):
+        """Config.save() メソッドのテスト"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
+            initial_data = {
+                "enabled": True,
+                "notification_sound": "Default",
+                "rules": []
+            }
+            json.dump(initial_data, f)
+            temp_file = f.name
+
+        try:
+            config = Config(temp_file)
+            config.notification_sound = "SMS"
+            config.enabled = False
+            assert config.save() is True
+
+            # ファイルが正しく保存されたか確認
+            with open(temp_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            assert data["notification_sound"] == "SMS"
+            assert data["enabled"] is False
+        finally:
+            os.unlink(temp_file)
+
+    def test_config_save_preserves_rules(self):
+        """Config.save() がルールを保持することを確認"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
+            initial_data = {
+                "enabled": True,
+                "notification_sound": "Default",
+                "rules": [
+                    {
+                        "name": "test-rule",
+                        "type": "literal",
+                        "from": "a",
+                        "to": "b",
+                        "enabled": True
+                    }
+                ]
+            }
+            json.dump(initial_data, f)
+            temp_file = f.name
+
+        try:
+            config = Config(temp_file)
+            config.notification_sound = "Reminder"
+            assert config.save() is True
+
+            # ファイルが正しく保存されたか確認
+            with open(temp_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            assert data["notification_sound"] == "Reminder"
+            assert len(data["rules"]) == 1
+            assert data["rules"][0]["name"] == "test-rule"
+        finally:
+            os.unlink(temp_file)
+
 
 class TestConfigTransformerIntegration:
     """Config と Transformer の統合テスト"""
-    
+
     def test_load_rules_into_transformer(self):
         """設定ファイルからTransformerへのルール読み込み"""
         config_data = {
@@ -195,18 +315,18 @@ class TestConfigTransformerIntegration:
                 }
             ]
         }
-        
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
             json.dump(config_data, f)
             temp_file = f.name
-        
+
         try:
             config = Config(temp_file)
             transformer = Transformer()
             transformer.load_rules_from_config(config.get_rules())
-            
+
             assert len(transformer.rules) == 2
-            
+
             # 実際の変換テスト
             result = transformer.transform("旧文字列 and 2026-05-03")
             assert result == "新文字列 and DATE_REMOVED"
