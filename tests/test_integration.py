@@ -7,9 +7,11 @@ import time
 import json
 import tempfile
 import os
+from unittest.mock import Mock, patch, MagicMock
 from config import Config
 from transformer import Transformer
 from clipboard_util import get_text, set_text, has_text
+from main import ClipboardTransformerApp
 
 
 class TestClipboardOperations:
@@ -182,3 +184,191 @@ class TestClipboardTransformation:
         # 再取得して確認
         final = get_text()
         assert final == "新文字列"
+
+
+class TestOnPasteDetected:
+    """_on_paste_detected() メソッドの統合テスト"""
+    
+    @pytest.fixture
+    def temp_config_file(self):
+        """テスト用の一時設定ファイルを作成"""
+        config_data = {
+            "enabled": True,
+            "rules": [
+                {
+                    "name": "test-rule",
+                    "type": "literal",
+                    "from": "変換前",
+                    "to": "変換後",
+                    "enabled": True
+                }
+            ]
+        }
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
+            json.dump(config_data, f)
+            temp_file = f.name
+        
+        yield temp_file
+        
+        if os.path.exists(temp_file):
+            os.unlink(temp_file)
+    
+    @pytest.fixture
+    def app(self, temp_config_file):
+        """モックされたKeyboardHookを持つアプリケーションインスタンス"""
+        with patch('main.KeyboardHook') as mock_hook_class:
+            mock_hook_instance = Mock()
+            mock_hook_class.return_value = mock_hook_instance
+            
+            with patch('main.Config') as mock_config_class:
+                mock_config = Config(temp_config_file)
+                mock_config_class.return_value = mock_config
+                
+                app = ClipboardTransformerApp()
+                app.hook = mock_hook_instance
+                return app
+    
+    @patch('main.has_text')
+    @patch('main.get_text')
+    @patch('main.set_text')
+    def test_disabled_returns_false(self, mock_set, mock_get, mock_has, app):
+        """機能が無効の場合は False を返す"""
+        app.config.enabled = False
+        
+        result = app._on_paste_detected()
+        
+        assert result is False
+        mock_has.assert_not_called()
+        mock_get.assert_not_called()
+        mock_set.assert_not_called()
+    
+    @patch('main.has_text', return_value=False)
+    @patch('main.get_text')
+    @patch('main.set_text')
+    def test_no_text_returns_false(self, mock_set, mock_get, mock_has, app):
+        """クリップボードにテキストがない場合は False を返す"""
+        app.config.enabled = True
+        
+        result = app._on_paste_detected()
+        
+        assert result is False
+        mock_has.assert_called_once()
+        mock_get.assert_not_called()
+        mock_set.assert_not_called()
+    
+    @patch('main.has_text', return_value=True)
+    @patch('main.get_text', return_value="")
+    @patch('main.set_text')
+    def test_empty_text_returns_false(self, mock_set, mock_get, mock_has, app):
+        """空文字列の場合は False を返す"""
+        app.config.enabled = True
+        
+        result = app._on_paste_detected()
+        
+        assert result is False
+        mock_has.assert_called_once()
+        mock_get.assert_called_once()
+        mock_set.assert_not_called()
+    
+    @patch('main.has_text', return_value=True)
+    @patch('main.get_text', return_value="変換されないテキスト")
+    @patch('main.set_text')
+    def test_no_transformation_returns_false(self, mock_set, mock_get, mock_has, app):
+        """変換が不要な場合は False を返す"""
+        app.config.enabled = True
+        
+        result = app._on_paste_detected()
+        
+        assert result is False
+        mock_has.assert_called_once()
+        mock_get.assert_called_once()
+        mock_set.assert_not_called()
+    
+    @patch('main.has_text', return_value=True)
+    @patch('main.get_text', return_value="変換前テキスト")
+    @patch('main.set_text', return_value=False)
+    def test_set_text_fails_returns_false(self, mock_set, mock_get, mock_has, app):
+        """set_text が失敗した場合は False を返す"""
+        app.config.enabled = True
+        
+        result = app._on_paste_detected()
+        
+        assert result is False
+        mock_has.assert_called_once()
+        mock_get.assert_called_once()
+        mock_set.assert_called_once_with("変換後テキスト")
+        app.hook.simulate_paste.assert_not_called()
+    
+    @patch('main.NOTIFICATION_AVAILABLE', True)
+    @patch('main.Notification')
+    @patch('main.has_text', return_value=True)
+    @patch('main.get_text', return_value="変換前テキスト")
+    @patch('main.set_text', return_value=True)
+    def test_successful_transformation(self, mock_set, mock_get, mock_has, mock_notification_class, app):
+        """正常に変換できた場合は True を返し、通知とペーストを実行"""
+        app.config.enabled = True
+        mock_notification = Mock()
+        mock_notification_class.return_value = mock_notification
+        
+        result = app._on_paste_detected()
+        
+        assert result is True
+        mock_has.assert_called_once()
+        mock_get.assert_called_once()
+        mock_set.assert_called_once_with("変換後テキスト")
+        
+        # 通知が表示された
+        mock_notification_class.assert_called_once()
+        mock_notification.set_audio.assert_called_once()
+        mock_notification.show.assert_called_once()
+        
+        # ペーストがシミュレートされた
+        app.hook.simulate_paste.assert_called_once()
+    
+    @patch('main.NOTIFICATION_AVAILABLE', False)
+    @patch('main.has_text', return_value=True)
+    @patch('main.get_text', return_value="変換前テキスト")
+    @patch('main.set_text', return_value=True)
+    def test_transformation_without_notification(self, mock_set, mock_get, mock_has, app):
+        """通知が無効でも変換は成功する"""
+        app.config.enabled = True
+        
+        result = app._on_paste_detected()
+        
+        assert result is True
+        mock_set.assert_called_once_with("変換後テキスト")
+        app.hook.simulate_paste.assert_called_once()
+    
+    @patch('main.NOTIFICATION_AVAILABLE', True)
+    @patch('main.Notification')
+    @patch('main.has_text', return_value=True)
+    @patch('main.get_text', return_value="変換前テキスト")
+    @patch('main.set_text', return_value=True)
+    def test_notification_error_does_not_fail(self, mock_set, mock_get, mock_has, mock_notification_class, app):
+        """通知でエラーが発生しても変換は成功する"""
+        app.config.enabled = True
+        mock_notification = Mock()
+        mock_notification.show.side_effect = Exception("Test notification error")
+        mock_notification_class.return_value = mock_notification
+        
+        result = app._on_paste_detected()
+        
+        # エラーが発生しても True を返す
+        assert result is True
+        mock_set.assert_called_once_with("変換後テキスト")
+        app.hook.simulate_paste.assert_called_once()
+    
+    @patch('main.has_text', return_value=True)
+    @patch('main.get_text', return_value="変換前の変換前テキスト")
+    @patch('main.set_text', return_value=True)
+    def test_multiple_occurrences(self, mock_set, mock_get, mock_has, app):
+        """複数回出現する文字列も正しく変換される"""
+        app.config.enabled = True
+        
+        result = app._on_paste_detected()
+        
+        assert result is True
+        # "変換前" が2回出現する → "変換後" に2回変換される
+        mock_set.assert_called_once_with("変換後の変換後テキスト")
+
