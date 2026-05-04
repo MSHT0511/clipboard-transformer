@@ -160,6 +160,11 @@ class ClipboardTransformerApp:
             self.config.notification_sound = sound_name
             self.config.save()
             logger.info(f"Notification sound changed to: {sound_name}")
+
+            # 選択時に自動プレビュー（Silentを除く）
+            if sound_name != "Silent":
+                self._play_preview_sound(sound_name)
+
             icon.update_menu()
         return handler
 
@@ -178,16 +183,16 @@ class ClipboardTransformerApp:
             "Reminder": "Notification.Reminder",
             "SMS": "Notification.SMS"
         }
-        
+
         registry_path = sound_mapping.get(sound_name, ".Default")
-        
+
         try:
             # レジストリからサウンドファイルのパスを取得
             key_path = f"AppEvents\\Schemes\\Apps\\.Default\\{registry_path}\\.Current"
             key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path)
             sound_file, _ = winreg.QueryValueEx(key, "")
             winreg.CloseKey(key)
-            
+
             if sound_file:
                 # 非同期で再生（SND_ASYNC: アプリケーションをブロックしない）
                 winsound.PlaySound(
@@ -204,13 +209,6 @@ class ClipboardTransformerApp:
         except Exception as e:
             logger.error(f"Error playing sound {sound_name}: {e}")
             winsound.MessageBeep(winsound.MB_OK)
-
-    def _on_preview_sound(self, sound_name):
-        """サウンドプレビューが選択された時のハンドラを返す"""
-        def handler(icon, item):
-            logger.info(f"Previewing sound: {sound_name}")
-            self._play_preview_sound(sound_name)
-        return handler
 
     def _on_open_log(self, icon, item):
         """ログファイルを開く"""
@@ -242,27 +240,17 @@ class ClipboardTransformerApp:
 
     def _get_menu_items(self):
         """システムトレイのメニュー項目を生成"""
-        # サウンドメニューの項目を生成（各サウンドとそのプレビュー）
-        sound_items = []
-        for sound_name in Config.VALID_SOUNDS:
-            # サウンド選択項目（ラジオボタン）
-            sound_items.append(
-                item(
-                    sound_name,
-                    self._on_sound_selected(sound_name),
-                    checked=self._is_sound_checked(sound_name),
-                    radio=True
-                )
+        # サウンドメニューの項目を生成（選択時に自動プレビュー）
+        sound_items = [
+            item(
+                sound_name,
+                self._on_sound_selected(sound_name),
+                checked=self._is_sound_checked(sound_name),
+                radio=True
             )
-            # プレビュー項目（Silentを除く）
-            if sound_name != "Silent":
-                sound_items.append(
-                    item(
-                        f"  {sound_name} (プレビュー)",
-                        self._on_preview_sound(sound_name)
-                    )
-                )
-        
+            for sound_name in Config.VALID_SOUNDS
+        ]
+
         sound_menu = pystray.Menu(*sound_items)
 
         return (
