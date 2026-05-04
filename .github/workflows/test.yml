@@ -8,25 +8,13 @@ on:
 
 jobs:
   test:
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
     permissions:
       contents: write
       pull-requests: write
     strategy:
       matrix:
-        include:
-          - os: windows-latest
-            python-version: '3.8'
-          - os: windows-latest
-            python-version: '3.9'
-          - os: windows-latest
-            python-version: '3.10'
-          - os: windows-latest
-            python-version: '3.11'
-          - os: windows-latest
-            python-version: '3.12'
-          - os: ubuntu-latest
-            python-version: '3.12'
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
 
     steps:
     - uses: actions/checkout@v3
@@ -46,11 +34,11 @@ jobs:
         pytest tests/ -v --cov=. --cov-report=term-missing --cov-report=xml
 
     - name: Post coverage comment to PR
-      uses: py-cov-action/python-coverage-comment-action@v3
-      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+      uses: orgoro/coverage@v3.1
+      if: github.event_name == 'pull_request' && matrix.python-version == '3.12'
       with:
-        GITHUB_TOKEN: ${{ github.token }}
-        ANNOTATE_MISSING_LINES: true
-        ANNOTATION_TYPE: warning
-        MINIMUM_GREEN: 90
-        MINIMUM_ORANGE: 70
+        coverageFile: coverage.xml
+        token: ${{ secrets.GITHUB_TOKEN }}
+        thresholdAll: 0.9
+        thresholdNew: 0.9
+        thresholdModified: 0.9
