@@ -4,29 +4,30 @@
 システムトレイに常駐し、Ctrl+V でクリップボード変換を実行する。
 """
 
-import sys
-import os
-import logging
-import winsound
-import winreg
 import ctypes
+import logging
+import os
+import sys
+import winreg
+import winsound
 from pathlib import Path
-from PIL import Image, ImageDraw
-import pystray
-from pystray import MenuItem as item
-import threading
-import win32event
-import win32api
-import winerror
 
+import pystray
+import win32api
+import win32event
+import winerror
+from PIL import Image, ImageDraw
+from pystray import MenuItem
+
+from clipboard_util import get_text, has_text, set_text
 from config import Config
-from transformer import Transformer
-from clipboard_util import get_text, set_text, has_text
 from hook import KeyboardHook
+from transformer import Transformer
 
 # Windows通知用
 try:
     from winotify import Notification, audio
+
     NOTIFICATION_AVAILABLE = True
 except ImportError:
     NOTIFICATION_AVAILABLE = False
@@ -35,16 +36,13 @@ except ImportError:
 
 
 # ログファイルのパス
-LOG_FILE_PATH = 'clipboard-transformer.log'
+LOG_FILE_PATH = "clipboard-transformer.log"
 
 # ログ設定
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(LOG_FILE_PATH, encoding='utf-8'),
-        logging.StreamHandler(sys.stdout)
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.FileHandler(LOG_FILE_PATH, encoding="utf-8"), logging.StreamHandler(sys.stdout)],
 )
 
 logger = logging.getLogger(__name__)
@@ -112,10 +110,7 @@ class ClipboardTransformerApp:
         try:
             if NOTIFICATION_AVAILABLE:
                 toast = Notification(
-                    app_id="Clipboard Transformer",
-                    title="変換完了",
-                    msg="テキストが変換されました",
-                    duration="short"
+                    app_id="Clipboard Transformer", title="変換完了", msg="テキストが変換されました", duration="short"
                 )
                 toast.set_audio(self._get_audio_sound(), loop=False)
                 toast.show()
@@ -133,15 +128,15 @@ class ClipboardTransformerApp:
         # シンプルな 64x64 のアイコンを作成
         width = 64
         height = 64
-        image = Image.new('RGB', (width, height), color='white')
+        image = Image.new("RGB", (width, height), color="white")
         draw = ImageDraw.Draw(image)
 
         # 背景色を状態に応じて変更（有効=緑、無効=赤）
-        color = 'green' if enabled else 'red'
+        color = "green" if enabled else "red"
         draw.rectangle([0, 0, width, height], fill=color)
 
         # "CT" の文字を描画（Clipboard Transformer）
-        draw.text((10, 20), "CT", fill='white')
+        draw.text((10, 20), "CT", fill="white")
 
         return image
 
@@ -157,6 +152,7 @@ class ClipboardTransformerApp:
         icon.icon = self._create_icon_image(self.config.enabled)
         # アイコンのメニューを更新
         icon.update_menu()
+
     def _get_audio_sound(self):
         """設定された通知音の audio オブジェクトを返す"""
         sound_name = self.config.notification_sound
@@ -164,6 +160,7 @@ class ClipboardTransformerApp:
 
     def _on_sound_selected(self, sound_name):
         """通知音が選択された時のハンドラを返す"""
+
         def handler(icon, item):
             self.config.notification_sound = sound_name
             self.config.save()
@@ -174,12 +171,15 @@ class ClipboardTransformerApp:
                 self._play_preview_sound(sound_name)
 
             icon.update_menu()
+
         return handler
 
     def _is_sound_checked(self, sound_name):
         """通知音が選択中かどうかを返す"""
+
         def checker(item):
             return self.config.notification_sound == sound_name
+
         return checker
 
     def _play_preview_sound(self, sound_name):
@@ -189,7 +189,7 @@ class ClipboardTransformerApp:
             "IM": "Notification.IM",
             "Mail": "Notification.Mail",
             "Reminder": "Notification.Reminder",
-            "SMS": "Notification.SMS"
+            "SMS": "Notification.SMS",
         }
 
         registry_path = sound_mapping.get(sound_name, ".Default")
@@ -203,10 +203,7 @@ class ClipboardTransformerApp:
 
             if sound_file:
                 # 非同期で再生（SND_ASYNC: アプリケーションをブロックしない）
-                winsound.PlaySound(
-                    sound_file,
-                    winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT
-                )
+                winsound.PlaySound(sound_file, winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT)
                 logger.debug(f"Playing preview sound: {sound_file}")
             else:
                 logger.warning(f"No sound file found for {sound_name}")
@@ -250,11 +247,8 @@ class ClipboardTransformerApp:
         """システムトレイのメニュー項目を生成"""
         # サウンドメニューの項目を生成（選択時に自動プレビュー）
         sound_items = [
-            item(
-                sound_name,
-                self._on_sound_selected(sound_name),
-                checked=self._is_sound_checked(sound_name),
-                radio=True
+            MenuItem(
+                sound_name, self._on_sound_selected(sound_name), checked=self._is_sound_checked(sound_name), radio=True
             )
             for sound_name in Config.VALID_SOUNDS
         ]
@@ -262,15 +256,15 @@ class ClipboardTransformerApp:
         sound_menu = pystray.Menu(*sound_items)
 
         return (
-            item(
+            MenuItem(
                 lambda text: f"{'Disable' if self.config.enabled else 'Enable'} Transformation",
                 self._on_toggle,
-                default=True
+                default=True,
             ),
-            item('Notification Sound', sound_menu),
-            item('Open Log File', self._on_open_log),
-            item('Reload Config', self._on_reload),
-            item('Quit', self._on_quit)
+            MenuItem("Notification Sound", sound_menu),
+            MenuItem("Open Log File", self._on_open_log),
+            MenuItem("Reload Config", self._on_reload),
+            MenuItem("Quit", self._on_quit),
         )
 
     def run(self):
@@ -290,10 +284,7 @@ class ClipboardTransformerApp:
         # システムトレイアイコンを作成
         icon_image = self._create_icon_image(self.config.enabled)
         self.icon = pystray.Icon(
-            "clipboard_transformer",
-            icon_image,
-            "Clipboard Transformer",
-            menu=pystray.Menu(self._get_menu_items)
+            "clipboard_transformer", icon_image, "Clipboard Transformer", menu=pystray.Menu(self._get_menu_items)
         )
 
         logger.info("Application started successfully")
@@ -323,7 +314,7 @@ def main():
                 0,
                 "Clipboard Transformer は既に起動しています。\n\nシステムトレイのアイコンを確認してください。",
                 "Clipboard Transformer",
-                0x40  # MB_ICONINFORMATION
+                0x40,  # MB_ICONINFORMATION
             )
             sys.exit(1)
 

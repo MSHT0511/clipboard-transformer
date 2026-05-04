@@ -3,9 +3,9 @@
 """
 
 import json
-import os
 import logging
-from typing import Dict, List, Any
+import os
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -13,11 +13,7 @@ logger = logging.getLogger(__name__)
 class Config:
     """設定ファイルの管理クラス"""
 
-    DEFAULT_CONFIG = {
-        "enabled": True,
-        "notification_sound": "Default",
-        "rules": []
-    }
+    DEFAULT_CONFIG = {"enabled": True, "notification_sound": "Default", "rules": []}
 
     VALID_SOUNDS = ["Default", "IM", "Mail", "Reminder", "SMS", "Silent"]
 
@@ -36,7 +32,7 @@ class Config:
             return
 
         try:
-            with open(self.config_path, 'r', encoding='utf-8') as f:
+            with open(self.config_path, encoding="utf-8") as f:
                 data = json.load(f)
 
             if not isinstance(data, dict):
@@ -97,10 +93,9 @@ class Config:
                     continue
 
             # regex タイプのバリデーション
-            elif rule_type == "regex":
-                if "pattern" not in rule or "replacement" not in rule:
-                    logger.warning(f"Regex rule '{name}' missing 'pattern' or 'replacement', skipping")
-                    continue
+            elif rule_type == "regex" and ("pattern" not in rule or "replacement" not in rule):
+                logger.warning(f"Regex rule '{name}' missing 'pattern' or 'replacement', skipping")
+                continue
 
             valid_rules.append(rule)
 
@@ -115,7 +110,7 @@ class Config:
         """機能が有効かどうかを返す"""
         return self.enabled
 
-    def get_rules(self) -> List[Dict[str, Any]]:
+    def get_rules(self) -> list[dict[str, Any]]:
         """ルールリストを返す"""
         return self.rules
 
@@ -124,25 +119,19 @@ class Config:
         sample_config = {
             "enabled": True,
             "rules": [
-                {
-                    "name": "example-literal",
-                    "type": "literal",
-                    "from": "旧文字列",
-                    "to": "新文字列",
-                    "enabled": True
-                },
+                {"name": "example-literal", "type": "literal", "from": "旧文字列", "to": "新文字列", "enabled": True},
                 {
                     "name": "remove-dates",
                     "type": "regex",
                     "pattern": "\\d{4}-\\d{2}-\\d{2}",
                     "replacement": "DATE_REMOVED",
-                    "enabled": True
-                }
-            ]
+                    "enabled": True,
+                },
+            ],
         }
 
         try:
-            with open(self.config_path, 'w', encoding='utf-8') as f:
+            with open(self.config_path, "w", encoding="utf-8") as f:
                 json.dump(sample_config, f, ensure_ascii=False, indent=2)
             logger.info(f"Default config saved to {self.config_path}")
             return True
@@ -156,14 +145,14 @@ class Config:
             # 既存のファイルを読み込んで更新
             data = {}
             if os.path.exists(self.config_path):
-                with open(self.config_path, 'r', encoding='utf-8') as f:
+                with open(self.config_path, encoding="utf-8") as f:
                     data = json.load(f)
 
             data["enabled"] = self.enabled
             data["notification_sound"] = self.notification_sound
             data["rules"] = self.rules
 
-            with open(self.config_path, 'w', encoding='utf-8') as f:
+            with open(self.config_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             logger.info("Config saved")
             return True

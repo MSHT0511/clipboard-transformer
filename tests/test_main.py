@@ -5,22 +5,21 @@ main.py の ClipboardTransformerApp クラスのテスト
 アプリケーションロジックをテストする。
 """
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock, call
 import json
-import tempfile
 import os
-from pathlib import Path
+import tempfile
+from unittest.mock import Mock, patch
+
 from PIL import Image
 
-from main import ClipboardTransformerApp, main
 from config import Config
+from main import ClipboardTransformerApp, main
 
 
 class TestClipboardTransformerAppInit:
     """ClipboardTransformerApp の初期化テスト"""
 
-    @patch('main.KeyboardHook')
+    @patch("main.KeyboardHook")
     def test_init_creates_components(self, mock_hook_class):
         """初期化時に必要なコンポーネントが作成される"""
         mock_hook = Mock()
@@ -36,29 +35,21 @@ class TestClipboardTransformerAppInit:
         # KeyboardHook がコールバック付きで作成された
         mock_hook_class.assert_called_once()
         call_args = mock_hook_class.call_args
-        assert 'on_paste_callback' in call_args[1]
+        assert "on_paste_callback" in call_args[1]
 
-    @patch('main.KeyboardHook')
+    @patch("main.KeyboardHook")
     def test_init_loads_rules(self, mock_hook_class):
         """初期化時にルールが読み込まれる"""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as f:
             config_data = {
                 "enabled": True,
-                "rules": [
-                    {
-                        "name": "test-rule",
-                        "type": "literal",
-                        "from": "A",
-                        "to": "B",
-                        "enabled": True
-                    }
-                ]
+                "rules": [{"name": "test-rule", "type": "literal", "from": "A", "to": "B", "enabled": True}],
             }
             json.dump(config_data, f)
             temp_file = f.name
 
         try:
-            with patch('main.Config') as mock_config_class:
+            with patch("main.Config") as mock_config_class:
                 mock_config = Config(temp_file)
                 mock_config_class.return_value = mock_config
 
@@ -76,34 +67,22 @@ class TestClipboardTransformerAppInit:
 class TestReloadRules:
     """_reload_rules() のテスト"""
 
-    @patch('main.KeyboardHook')
+    @patch("main.KeyboardHook")
     def test_reload_rules_success(self, mock_hook_class):
         """ルールの再読み込みが成功"""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as f:
             config_data = {
                 "enabled": True,
                 "rules": [
-                    {
-                        "name": "rule1",
-                        "type": "literal",
-                        "from": "A",
-                        "to": "B",
-                        "enabled": True
-                    },
-                    {
-                        "name": "rule2",
-                        "type": "literal",
-                        "from": "C",
-                        "to": "D",
-                        "enabled": True
-                    }
-                ]
+                    {"name": "rule1", "type": "literal", "from": "A", "to": "B", "enabled": True},
+                    {"name": "rule2", "type": "literal", "from": "C", "to": "D", "enabled": True},
+                ],
             }
             json.dump(config_data, f)
             temp_file = f.name
 
         try:
-            with patch('main.Config') as mock_config_class:
+            with patch("main.Config") as mock_config_class:
                 mock_config = Config(temp_file)
                 mock_config_class.return_value = mock_config
 
@@ -115,17 +94,9 @@ class TestReloadRules:
                 # 設定を変更
                 new_config_data = {
                     "enabled": True,
-                    "rules": [
-                        {
-                            "name": "new-rule",
-                            "type": "literal",
-                            "from": "X",
-                            "to": "Y",
-                            "enabled": True
-                        }
-                    ]
+                    "rules": [{"name": "new-rule", "type": "literal", "from": "X", "to": "Y", "enabled": True}],
                 }
-                with open(temp_file, 'w', encoding='utf-8') as f:
+                with open(temp_file, "w", encoding="utf-8") as f:
                     json.dump(new_config_data, f)
 
                 # 再読み込み
@@ -140,7 +111,7 @@ class TestReloadRules:
             if os.path.exists(temp_file):
                 os.unlink(temp_file)
 
-    @patch('main.KeyboardHook')
+    @patch("main.KeyboardHook")
     def test_reload_rules_handles_error(self, mock_hook_class):
         """ルール読み込みエラーが発生してもクラッシュしない"""
         app = ClipboardTransformerApp()
@@ -161,7 +132,7 @@ class TestReloadRules:
 class TestCreateIconImage:
     """_create_icon_image() のテスト"""
 
-    @patch('main.KeyboardHook')
+    @patch("main.KeyboardHook")
     def test_create_icon_image(self, mock_hook_class):
         """アイコン画像が作成される"""
         app = ClipboardTransformerApp()
@@ -170,13 +141,13 @@ class TestCreateIconImage:
 
         assert isinstance(image, Image.Image)
         assert image.size == (64, 64)
-        assert image.mode == 'RGB'
+        assert image.mode == "RGB"
 
 
 class TestOnToggle:
     """_on_toggle() のテスト"""
 
-    @patch('main.KeyboardHook')
+    @patch("main.KeyboardHook")
     def test_toggle_enables(self, mock_hook_class):
         """無効状態から有効状態に切り替え"""
         mock_hook = Mock()
@@ -196,7 +167,7 @@ class TestOnToggle:
         mock_icon.notify.assert_called_once()
         mock_icon.update_menu.assert_called_once()
 
-    @patch('main.KeyboardHook')
+    @patch("main.KeyboardHook")
     def test_toggle_disables(self, mock_hook_class):
         """有効状態から無効状態に切り替え"""
         mock_hook = Mock()
@@ -220,9 +191,9 @@ class TestOnToggle:
 class TestGetAudioSound:
     """_get_audio_sound() のテスト"""
 
-    @patch('main.KeyboardHook')
-    @patch('main.NOTIFICATION_AVAILABLE', True)
-    @patch('main.audio')
+    @patch("main.KeyboardHook")
+    @patch("main.NOTIFICATION_AVAILABLE", True)
+    @patch("main.audio")
     def test_get_audio_sound_valid(self, mock_audio, mock_hook_class):
         """有効な通知音の取得"""
         mock_audio.Default = Mock()
@@ -235,9 +206,9 @@ class TestGetAudioSound:
 
         assert result == mock_audio.Mail
 
-    @patch('main.KeyboardHook')
-    @patch('main.NOTIFICATION_AVAILABLE', True)
-    @patch('main.audio')
+    @patch("main.KeyboardHook")
+    @patch("main.NOTIFICATION_AVAILABLE", True)
+    @patch("main.audio")
     def test_get_audio_sound_invalid_fallback(self, mock_audio, mock_hook_class):
         """無効な通知音は Default にフォールバック"""
         # MagicMockのデフォルト動作では、存在しない属性も自動生成される
@@ -261,7 +232,7 @@ class TestGetAudioSound:
 class TestSoundHandlers:
     """_on_sound_selected() と _is_sound_checked() のテスト"""
 
-    @patch('main.KeyboardHook')
+    @patch("main.KeyboardHook")
     def test_on_sound_selected(self, mock_hook_class):
         """通知音の選択ハンドラ（自動プレビュー付き）"""
         app = ClipboardTransformerApp()
@@ -276,8 +247,10 @@ class TestSoundHandlers:
         mock_icon = Mock()
         mock_item = Mock()
 
-        with patch.object(app.config, 'save') as mock_save, \
-             patch.object(app, '_play_preview_sound') as mock_play_preview:
+        with (
+            patch.object(app.config, "save") as mock_save,
+            patch.object(app, "_play_preview_sound") as mock_play_preview,
+        ):
             handler(mock_icon, mock_item)
 
         # 通知音が変更され、保存された
@@ -287,7 +260,7 @@ class TestSoundHandlers:
         # プレビューが再生された
         mock_play_preview.assert_called_once_with("Mail")
 
-    @patch('main.KeyboardHook')
+    @patch("main.KeyboardHook")
     def test_on_sound_selected_silent(self, mock_hook_class):
         """Silent選択時はプレビューが再生されない"""
         app = ClipboardTransformerApp()
@@ -299,8 +272,10 @@ class TestSoundHandlers:
         mock_icon = Mock()
         mock_item = Mock()
 
-        with patch.object(app.config, 'save') as mock_save, \
-             patch.object(app, '_play_preview_sound') as mock_play_preview:
+        with (
+            patch.object(app.config, "save") as mock_save,
+            patch.object(app, "_play_preview_sound") as mock_play_preview,
+        ):
             handler(mock_icon, mock_item)
 
         # 通知音が変更された
@@ -309,7 +284,7 @@ class TestSoundHandlers:
         # Silentの場合はプレビューが再生されない
         mock_play_preview.assert_not_called()
 
-    @patch('main.KeyboardHook')
+    @patch("main.KeyboardHook")
     def test_is_sound_checked_true(self, mock_hook_class):
         """選択中の通知音のチェック状態"""
         app = ClipboardTransformerApp()
@@ -326,7 +301,7 @@ class TestSoundHandlers:
 
         assert result is True
 
-    @patch('main.KeyboardHook')
+    @patch("main.KeyboardHook")
     def test_is_sound_checked_false(self, mock_hook_class):
         """選択されていない通知音のチェック状態"""
         app = ClipboardTransformerApp()
@@ -344,41 +319,30 @@ class TestSoundHandlers:
 class TestOnReload:
     """_on_reload() のテスト"""
 
-    @patch('main.KeyboardHook')
+    @patch("main.KeyboardHook")
     def test_on_reload(self, mock_hook_class):
         """設定の再読み込み"""
         mock_hook = Mock()
         mock_hook_class.return_value = mock_hook
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as f:
             config_data = {
                 "enabled": True,
-                "rules": [
-                    {
-                        "name": "test-rule",
-                        "type": "literal",
-                        "from": "A",
-                        "to": "B",
-                        "enabled": True
-                    }
-                ]
+                "rules": [{"name": "test-rule", "type": "literal", "from": "A", "to": "B", "enabled": True}],
             }
             json.dump(config_data, f)
             temp_file = f.name
 
         try:
-            with patch('main.Config') as mock_config_class:
+            with patch("main.Config") as mock_config_class:
                 mock_config = Config(temp_file)
                 mock_config_class.return_value = mock_config
 
                 app = ClipboardTransformerApp()
 
                 # 設定ファイルを変更
-                new_config_data = {
-                    "enabled": False,
-                    "rules": []
-                }
-                with open(temp_file, 'w', encoding='utf-8') as f:
+                new_config_data = {"enabled": False, "rules": []}
+                with open(temp_file, "w", encoding="utf-8") as f:
                     json.dump(new_config_data, f)
 
                 mock_icon = Mock()
@@ -399,7 +363,7 @@ class TestOnReload:
 class TestOnQuit:
     """_on_quit() のテスト"""
 
-    @patch('main.KeyboardHook')
+    @patch("main.KeyboardHook")
     def test_on_quit(self, mock_hook_class):
         """アプリケーションの終了"""
         mock_hook = Mock()
@@ -420,9 +384,9 @@ class TestOnQuit:
 class TestOnOpenLog:
     """_on_open_log() のテスト"""
 
-    @patch('main.KeyboardHook')
-    @patch('main.os.startfile')
-    @patch('main.Path')
+    @patch("main.KeyboardHook")
+    @patch("main.os.startfile")
+    @patch("main.Path")
     def test_open_log_success(self, mock_path_class, mock_startfile, mock_hook_class):
         """ログファイルが存在する場合、正常に開く"""
         app = ClipboardTransformerApp()
@@ -443,9 +407,9 @@ class TestOnOpenLog:
         # 通知は表示されない
         mock_icon.notify.assert_not_called()
 
-    @patch('main.KeyboardHook')
-    @patch('main.os.startfile')
-    @patch('main.Path')
+    @patch("main.KeyboardHook")
+    @patch("main.os.startfile")
+    @patch("main.Path")
     def test_open_log_not_found(self, mock_path_class, mock_startfile, mock_hook_class):
         """ログファイルが存在しない場合、警告通知を表示"""
         app = ClipboardTransformerApp()
@@ -467,9 +431,9 @@ class TestOnOpenLog:
         mock_icon.notify.assert_called_once()
         assert "not found" in mock_icon.notify.call_args[0][0]
 
-    @patch('main.KeyboardHook')
-    @patch('main.os.startfile')
-    @patch('main.Path')
+    @patch("main.KeyboardHook")
+    @patch("main.os.startfile")
+    @patch("main.Path")
     def test_open_log_error(self, mock_path_class, mock_startfile, mock_hook_class):
         """ログファイルを開く際にエラーが発生した場合、エラー通知を表示"""
         app = ClipboardTransformerApp()
@@ -494,11 +458,11 @@ class TestOnOpenLog:
 class TestPlayPreviewSound:
     """_play_preview_sound() と _on_preview_sound() のテスト"""
 
-    @patch('main.KeyboardHook')
-    @patch('main.winsound.PlaySound')
-    @patch('main.winreg.OpenKey')
-    @patch('main.winreg.QueryValueEx')
-    @patch('main.winreg.CloseKey')
+    @patch("main.KeyboardHook")
+    @patch("main.winsound.PlaySound")
+    @patch("main.winreg.OpenKey")
+    @patch("main.winreg.QueryValueEx")
+    @patch("main.winreg.CloseKey")
     def test_play_preview_sound_success(self, mock_close, mock_query, mock_open, mock_play, mock_hook_class):
         """サウンドプレビューが正常に再生される"""
         app = ClipboardTransformerApp()
@@ -520,12 +484,12 @@ class TestPlayPreviewSound:
         call_args = mock_play.call_args[0]
         assert call_args[0] == "C:\\Windows\\Media\\notify.wav"
 
-    @patch('main.KeyboardHook')
-    @patch('main.winsound.PlaySound')
-    @patch('main.winsound.MessageBeep')
-    @patch('main.winreg.OpenKey')
-    @patch('main.winreg.QueryValueEx')
-    @patch('main.winreg.CloseKey')
+    @patch("main.KeyboardHook")
+    @patch("main.winsound.PlaySound")
+    @patch("main.winsound.MessageBeep")
+    @patch("main.winreg.OpenKey")
+    @patch("main.winreg.QueryValueEx")
+    @patch("main.winreg.CloseKey")
     def test_play_preview_sound_no_file(self, mock_close, mock_query, mock_open, mock_beep, mock_play, mock_hook_class):
         """サウンドファイルが設定されていない場合、MessageBeepを再生"""
         app = ClipboardTransformerApp()
@@ -542,9 +506,9 @@ class TestPlayPreviewSound:
         # MessageBeep が呼ばれた
         mock_beep.assert_called_once()
 
-    @patch('main.KeyboardHook')
-    @patch('main.winsound.MessageBeep')
-    @patch('main.winreg.OpenKey')
+    @patch("main.KeyboardHook")
+    @patch("main.winsound.MessageBeep")
+    @patch("main.winreg.OpenKey")
     def test_play_preview_sound_registry_error(self, mock_open, mock_beep, mock_hook_class):
         """レジストリ読み取りエラー時、MessageBeepを再生"""
         app = ClipboardTransformerApp()
@@ -557,11 +521,12 @@ class TestPlayPreviewSound:
         # MessageBeep が呼ばれた
         mock_beep.assert_called_once()
 
+
 class TestGetMenuItems:
     """_get_menu_items() のテスト"""
 
-    @patch('main.KeyboardHook')
-    @patch('main.pystray')
+    @patch("main.KeyboardHook")
+    @patch("main.pystray")
     def test_get_menu_items(self, mock_pystray, mock_hook_class):
         """メニュー項目が生成される"""
         app = ClipboardTransformerApp()
@@ -579,9 +544,9 @@ class TestGetMenuItems:
 class TestRun:
     """run() のテスト"""
 
-    @patch('main.KeyboardHook')
-    @patch('main.pystray.Icon')
-    @patch('main.Path')
+    @patch("main.KeyboardHook")
+    @patch("main.pystray.Icon")
+    @patch("main.Path")
     def test_run_with_existing_config(self, mock_path, mock_icon_class, mock_hook_class):
         """既存の設定ファイルがある場合"""
         mock_hook = Mock()
@@ -605,9 +570,9 @@ class TestRun:
         mock_icon_class.assert_called_once()
         mock_icon.run.assert_called_once()
 
-    @patch('main.KeyboardHook')
-    @patch('main.pystray.Icon')
-    @patch('main.Path')
+    @patch("main.KeyboardHook")
+    @patch("main.pystray.Icon")
+    @patch("main.Path")
     def test_run_creates_default_config(self, mock_path, mock_icon_class, mock_hook_class):
         """設定ファイルがない場合はデフォルトを作成"""
         mock_hook = Mock()
@@ -621,19 +586,21 @@ class TestRun:
 
         app = ClipboardTransformerApp()
 
-        with patch.object(app.config, 'save_default_config') as mock_save_default:
-            with patch.object(app.config, 'reload') as mock_reload:
-                app.run()
+        with (
+            patch.object(app.config, "save_default_config") as mock_save_default,
+            patch.object(app.config, "reload") as mock_reload,
+        ):
+            app.run()
 
-                # デフォルト設定が作成され、再読み込みされた
-                mock_save_default.assert_called_once()
-                mock_reload.assert_called_once()
+            # デフォルト設定が作成され、再読み込みされた
+            mock_save_default.assert_called_once()
+            mock_reload.assert_called_once()
 
 
 class TestMainFunction:
     """main() 関数のテスト"""
 
-    @patch('main.ClipboardTransformerApp')
+    @patch("main.ClipboardTransformerApp")
     def test_main_runs_app(self, mock_app_class):
         """main() がアプリケーションを起動"""
         mock_app = Mock()
@@ -644,8 +611,8 @@ class TestMainFunction:
         mock_app_class.assert_called_once()
         mock_app.run.assert_called_once()
 
-    @patch('main.ClipboardTransformerApp')
-    @patch('main.sys.exit')
+    @patch("main.ClipboardTransformerApp")
+    @patch("main.sys.exit")
     def test_main_handles_keyboard_interrupt(self, mock_exit, mock_app_class):
         """Ctrl+C でクリーンに終了"""
         mock_app = Mock()
@@ -656,8 +623,8 @@ class TestMainFunction:
 
         mock_exit.assert_called_once_with(0)
 
-    @patch('main.ClipboardTransformerApp')
-    @patch('main.sys.exit')
+    @patch("main.ClipboardTransformerApp")
+    @patch("main.sys.exit")
     def test_main_handles_exception(self, mock_exit, mock_app_class):
         """エラー発生時は exit(1)"""
         mock_app = Mock()

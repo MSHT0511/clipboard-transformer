@@ -7,7 +7,7 @@ name = "clipboard-transformer"
 version = "1.0.0"
 description = "Windows clipboard text transformer with customizable rules"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
     {name = "Clipboard Transformer Contributors"}
@@ -19,8 +19,6 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -31,15 +29,18 @@ dependencies = [
     "keyboard>=0.13.5",
     "pywin32>=306",
     "pystray>=0.19.5",
-    "Pillow>=10.0.0",
+    "Pillow>=12.2.0",
     "winotify>=1.1.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0.0",
+    "pytest>=9.0.3",
     "pytest-cov>=4.0.0",
     "pyinstaller>=5.0.0",
+    "ruff>=0.15.4",
+    "bandit>=1.7.5",
+    "pip-audit>=2.6.0",
 ]
 
 [project.urls]
@@ -74,3 +75,40 @@ exclude_lines = [
     "raise NotImplementedError",
     "if __name__ == .__main__.:",
 ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+exclude = [
+    ".git",
+    ".pytest_cache",
+    "__pycache__",
+    "venv",
+    "build",
+    "dist",
+    "htmlcov",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.bandit]
+exclude_dirs = [".git", ".pytest_cache", "__pycache__", "tests", "venv", "build", "dist", "htmlcov"]
+skips = ["B101"]  # Skip assert_used check for tests
