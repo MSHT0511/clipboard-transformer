@@ -128,7 +128,7 @@ class ClipboardTransformerApp:
 
         return True
 
-    def _create_icon_image(self):
+    def _create_icon_image(self, enabled=True):
         """システムトレイアイコン用の画像を生成"""
         # シンプルな 64x64 のアイコンを作成
         width = 64
@@ -136,8 +136,9 @@ class ClipboardTransformerApp:
         image = Image.new('RGB', (width, height), color='white')
         draw = ImageDraw.Draw(image)
 
-        # 背景を緑色に
-        draw.rectangle([0, 0, width, height], fill='green')
+        # 背景色を状態に応じて変更（有効=緑、無効=赤）
+        color = 'green' if enabled else 'red'
+        draw.rectangle([0, 0, width, height], fill=color)
 
         # "CT" の文字を描画（Clipboard Transformer）
         draw.text((10, 20), "CT", fill='white')
@@ -146,11 +147,14 @@ class ClipboardTransformerApp:
 
     def _on_toggle(self, icon, item):
         """有効/無効の切り替え"""
+        logger.info("Toggle action triggered (left click or menu)")
         self.config.enabled = not self.config.enabled
         self.hook.set_enabled(self.config.enabled)
         status = "enabled" if self.config.enabled else "disabled"
         logger.info(f"Transformation {status}")
         icon.notify(f"Clipboard Transformer {status}", "Status Changed")
+        # アイコンの画像を更新
+        icon.icon = self._create_icon_image(self.config.enabled)
         # アイコンのメニューを更新
         icon.update_menu()
     def _get_audio_sound(self):
@@ -260,7 +264,8 @@ class ClipboardTransformerApp:
         return (
             item(
                 lambda text: f"{'Disable' if self.config.enabled else 'Enable'} Transformation",
-                self._on_toggle
+                self._on_toggle,
+                default=True
             ),
             item('Notification Sound', sound_menu),
             item('Open Log File', self._on_open_log),
@@ -283,7 +288,7 @@ class ClipboardTransformerApp:
         self.hook.start()
 
         # システムトレイアイコンを作成
-        icon_image = self._create_icon_image()
+        icon_image = self._create_icon_image(self.config.enabled)
         self.icon = pystray.Icon(
             "clipboard_transformer",
             icon_image,
@@ -304,12 +309,12 @@ def main():
     # ミューテックスを作成して重複起動を防ぐ
     mutex_name = "Global\\ClipboardTransformer_SingleInstance"
     mutex = None
-    
+
     try:
         # ミューテックスを作成
         mutex = win32event.CreateMutex(None, False, mutex_name)
         last_error = win32api.GetLastError()
-        
+
         # 既にミューテックスが存在する場合（既に起動している）
         if last_error == winerror.ERROR_ALREADY_EXISTS:
             logger.warning("Application is already running")
@@ -321,9 +326,9 @@ def main():
                 0x40  # MB_ICONINFORMATION
             )
             sys.exit(1)
-        
+
         logger.info("Single instance mutex created successfully")
-        
+
         app = ClipboardTransformerApp()
         app.run()
     except KeyboardInterrupt:
