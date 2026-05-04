@@ -9,11 +9,15 @@ import os
 import logging
 import winsound
 import winreg
+import ctypes
 from pathlib import Path
 from PIL import Image, ImageDraw
 import pystray
 from pystray import MenuItem as item
 import threading
+import win32event
+import win32api
+import winerror
 
 from config import Config
 from transformer import Transformer
@@ -297,7 +301,29 @@ class ClipboardTransformerApp:
 
 def main():
     """エントリポイント"""
+    # ミューテックスを作成して重複起動を防ぐ
+    mutex_name = "Global\\ClipboardTransformer_SingleInstance"
+    mutex = None
+    
     try:
+        # ミューテックスを作成
+        mutex = win32event.CreateMutex(None, False, mutex_name)
+        last_error = win32api.GetLastError()
+        
+        # 既にミューテックスが存在する場合（既に起動している）
+        if last_error == winerror.ERROR_ALREADY_EXISTS:
+            logger.warning("Application is already running")
+            # メッセージボックスを表示
+            ctypes.windll.user32.MessageBoxW(
+                0,
+                "Clipboard Transformer は既に起動しています。\n\nシステムトレイのアイコンを確認してください。",
+                "Clipboard Transformer",
+                0x40  # MB_ICONINFORMATION
+            )
+            sys.exit(1)
+        
+        logger.info("Single instance mutex created successfully")
+        
         app = ClipboardTransformerApp()
         app.run()
     except KeyboardInterrupt:
@@ -306,6 +332,10 @@ def main():
     except Exception as e:
         logger.exception(f"Fatal error: {e}")
         sys.exit(1)
+    finally:
+        # ミューテックスを解放
+        if mutex:
+            win32api.CloseHandle(mutex)
 
 
 if __name__ == "__main__":
