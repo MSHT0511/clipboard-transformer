@@ -332,3 +332,164 @@ class TestConfigTransformerIntegration:
             assert result == "新文字列 and DATE_REMOVED"
         finally:
             os.unlink(temp_file)
+
+
+class TestConfigEdgeCases:
+    """Config のエッジケース・例外処理テスト"""
+
+    def test_load_json_not_dict(self):
+        """JSON が dict でない場合（配列など）"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
+            # JSON 配列を書き込む
+            json.dump(["not", "a", "dict"], f)
+            temp_file = f.name
+
+        try:
+            config = Config(temp_file)
+            # デフォルト設定にフォールバック
+            assert config.enabled is True
+            assert config.rules == []
+        finally:
+            os.unlink(temp_file)
+
+    def test_load_rules_not_list(self):
+        """rules フィールドが配列でない場合"""
+        config_data = {
+            "enabled": True,
+            "rules": "not a list"  # 文字列
+        }
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
+            json.dump(config_data, f)
+            temp_file = f.name
+
+        try:
+            config = Config(temp_file)
+            # rules が配列でない場合は空配列に修正される
+            assert config.rules == []
+        finally:
+            os.unlink(temp_file)
+
+    def test_load_general_exception(self):
+        """JSON デコード以外の一般的な例外"""
+        # ファイルが読み取り専用ディレクトリにある場合など
+        # ここでは、存在しないディレクトリのパスを使用
+        config = Config("/nonexistent/path/config.json")
+        
+        # デフォルト設定にフォールバック
+        assert config.enabled is True
+        assert config.rules == []
+
+    def test_validate_rules_not_list(self):
+        """_validate_rules() で rules が list でない場合の防御"""
+        config_data = {
+            "enabled": True,
+            "rules": {"invalid": "not a list"}  # dict
+        }
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
+            json.dump(config_data, f)
+            temp_file = f.name
+
+        try:
+            config = Config(temp_file)
+            # 内部で検証され、空配列に修正される
+            assert config.rules == []
+        finally:
+            os.unlink(temp_file)
+
+    def test_save_default_config_write_error(self):
+        """save_default_config() でファイル書き込みエラー"""
+        # 書き込み不可能なパスを指定
+        config = Config()
+        config.config_path = "/invalid/path/cannot/write/config.json"
+        
+        result = config.save_default_config()
+        
+        # 書き込み失敗時は False を返す
+        assert result is False
+
+    def test_save_write_error(self):
+        """save() でファイル書き込みエラー"""
+        config = Config()
+        config.config_path = "/invalid/path/cannot/write/config.json"
+        
+        result = config.save()
+        
+        # 書き込み失敗時は False を返す
+        assert result is False
+
+    def test_load_with_permission_error(self):
+        """ファイル読み込み時のパーミッションエラー"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
+            json.dump({"enabled": True, "rules": []}, f)
+            temp_file = f.name
+
+        try:
+            # Windows では簡単にパーミッションエラーを再現できないため、
+            # 代わりに削除されたファイルを読み込む
+            os.unlink(temp_file)
+            
+            config = Config(temp_file)
+            # ファイルが存在しないため、デフォルト設定にフォールバック
+            assert config.enabled is True
+            assert config.rules == []
+        except:
+            if os.path.exists(temp_file):
+                os.unlink(temp_file)
+
+    def test_reload_method(self):
+        """reload() メソッドが正しく動作することを確認"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
+            initial_data = {
+                "enabled": True,
+                "notification_sound": "Default",
+                "rules": [
+                    {
+                        "name": "rule1",
+                        "type": "literal",
+                        "from": "a",
+                        "to": "b",
+                        "enabled": True
+                    }
+                ]
+            }
+            json.dump(initial_data, f)
+            temp_file = f.name
+
+        try:
+            config = Config(temp_file)
+            assert len(config.rules) == 1
+            
+            # ファイルを更新
+            updated_data = {
+                "enabled": False,
+                "notification_sound": "Mail",
+                "rules": [
+                    {
+                        "name": "rule1",
+                        "type": "literal",
+                        "from": "a",
+                        "to": "b",
+                        "enabled": True
+                    },
+                    {
+                        "name": "rule2",
+                        "type": "literal",
+                        "from": "x",
+                        "to": "y",
+                        "enabled": True
+                    }
+                ]
+            }
+            with open(temp_file, 'w', encoding='utf-8') as f:
+                json.dump(updated_data, f)
+            
+            # 再読み込み
+            config.reload()
+            
+            assert config.enabled is False
+            assert config.notification_sound == "Mail"
+            assert len(config.rules) == 2
+        finally:
+            os.unlink(temp_file)

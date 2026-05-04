@@ -115,3 +115,170 @@ class TestTransformer:
         transformer = Transformer()
         transformer.add_rule(LiteralRule("test", "foo", "bar"))
         assert transformer.transform("") == ""
+
+
+class TestRegexRuleExceptionHandling:
+    """RegexRule の例外処理テスト"""
+
+    def test_regex_invalid_backreference_in_replacement(self):
+        """無効な後方参照がある場合の処理"""
+        # パターンにキャプチャグループが無いのに、置換で \1 を使用
+        rule = RegexRule("test", r"\d+", r"[\1]")
+        # このケースでは実際にエラーが発生する可能性がある
+        # 実装では try-except で元のテキストを返す
+        result = rule.apply("test 123")
+        # エラーハンドリングにより、元のテキストまたは安全な結果を返す
+        assert isinstance(result, str)
+
+    def test_regex_apply_with_invalid_pattern(self):
+        """無効なパターンを持つルールは元のテキストを返す"""
+        rule = RegexRule("test", "[invalid(", "replacement")
+        # compiled_pattern が None の場合、元のテキストを返す
+        assert rule.compiled_pattern is None
+        result = rule.apply("test text")
+        assert result == "test text"
+
+
+class TestTransformerExceptionHandling:
+    """Transformer の例外処理テスト"""
+
+    def test_transform_continues_on_rule_exception(self):
+        """ルール適用中に例外が発生しても処理を継続"""
+        from unittest.mock import Mock
+        
+        transformer = Transformer()
+        
+        # 正常なルール
+        good_rule = LiteralRule("good", "foo", "bar")
+        
+        # 例外を投げるルール
+        bad_rule = Mock()
+        bad_rule.enabled = True
+        bad_rule.name = "bad_rule"
+        bad_rule.apply.side_effect = Exception("Rule error")
+        
+        # もう1つの正常なルール
+        another_good_rule = LiteralRule("another", "bar", "baz")
+        
+        transformer.add_rule(good_rule)
+        transformer.add_rule(bad_rule)
+        transformer.add_rule(another_good_rule)
+        
+        # foo -> bar -> (例外) -> baz
+        result = transformer.transform("foo")
+        
+        # 例外が発生しても処理は継続され、他のルールは適用される
+        assert result == "baz"
+
+
+class TestTransformerLoadRules:
+    """Transformer.load_rules_from_config() のテスト"""
+
+    def test_load_unknown_rule_type(self):
+        """未知のルールタイプは警告してスキップ"""
+        transformer = Transformer()
+        
+        rules_config = [
+            {
+                "name": "valid-rule",
+                "type": "literal",
+                "from": "foo",
+                "to": "bar",
+                "enabled": True
+            },
+            {
+                "name": "unknown-rule",
+                "type": "unknown_type",  # 未知のタイプ
+                "some_field": "value"
+            },
+            {
+                "name": "another-valid",
+                "type": "regex",
+                "pattern": r"\d+",
+                "replacement": "NUM",
+                "enabled": True
+            }
+        ]
+        
+        transformer.load_rules_from_config(rules_config)
+        
+        # 未知のタイプはスキップされ、有効なルールのみ読み込まれる
+        assert len(transformer.rules) == 2
+        assert transformer.rules[0].name == "valid-rule"
+        assert transformer.rules[1].name == "another-valid"
+
+    def test_load_rule_with_exception(self):
+        """ルール読み込み中の例外をハンドリング"""
+        transformer = Transformer()
+        
+        rules_config = [
+            {
+                "name": "valid-rule",
+                "type": "literal",
+                "from": "foo",
+                "to": "bar",
+                "enabled": True
+            },
+            {
+                "name": "broken-rule",
+                "type": "literal"
+                # 必須フィールド "from", "to" が欠如
+                # 実装では get() でデフォルト値 "" が使用されるため、
+                # 例外は発生せず、空文字列のルールとして読み込まれる
+            },
+            {
+                "name": "another-valid",
+                "type": "literal",
+                "from": "hello",
+                "to": "hi",
+                "enabled": True
+            }
+        ]
+        
+        # 例外が発生しても処理は継続
+        transformer.load_rules_from_config(rules_config)
+        
+        # from/to が無い場合もデフォルト値で読み込まれる
+        assert len(transformer.rules) == 3
+        assert transformer.rules[0].name == "valid-rule"
+        assert transformer.rules[1].name == "broken-rule"
+        assert transformer.rules[2].name == "another-valid"
+
+    def test_load_literal_rule_missing_fields(self):
+        """literalルールで必須フィールドが無い場合"""
+        transformer = Transformer()
+        
+        rules_config = [
+            {
+                "name": "incomplete",
+                "type": "literal"
+                # "from" と "to" が無い
+            }
+        ]
+        
+        # 例外が発生してもクラッシュしない
+        transformer.load_rules_from_config(rules_config)
+        
+        # from/to がデフォルト値 "" で読み込まれる
+        assert len(transformer.rules) == 1
+        assert transformer.rules[0].from_str == ""
+        assert transformer.rules[0].to_str == ""
+
+    def test_load_regex_rule_missing_fields(self):
+        """regexルールで必須フィールドが無い場合"""
+        transformer = Transformer()
+        
+        rules_config = [
+            {
+                "name": "incomplete-regex",
+                "type": "regex"
+                # "pattern" と "replacement" が無い
+            }
+        ]
+        
+        transformer.load_rules_from_config(rules_config)
+        
+        # pattern/replacement がデフォルト値 "" で読み込まれる
+        assert len(transformer.rules) == 1
+        # 空のパターンは無効なので compiled_pattern は None かもしれない
+        # または空文字列にマッチするパターンとして扱われる
