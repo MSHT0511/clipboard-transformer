@@ -172,6 +172,65 @@ pyinstaller --onefile --windowed --icon=icon.ico main.py
 
 生成された `dist/main.exe` を**管理者権限**で実行してください。
 
+## 開発者向け
+
+### 開発環境のセットアップ
+
+1. リポジトリをクローン
+
+```bash
+git clone <repository-url>
+cd clipboard-transformer
+```
+
+2. 開発用の依存関係をインストール
+
+```bash
+pip install -e ".[dev]"
+```
+
+3. pre-commit hooks をインストール
+
+```bash
+pre-commit install
+```
+
+### コード品質チェック
+
+コミット時に自動的に以下のチェックが実行されます：
+
+- **Ruff**: Python コードの lint とフォーマット
+- **Bandit**: セキュリティ問題の検出
+- **基本チェック**: trailing whitespace、YAML/JSON 構文、大きなファイルなど
+
+#### 手動でチェックを実行
+
+すべてのファイルに対してチェックを実行：
+
+```bash
+pre-commit run --all-files
+```
+
+特定のファイルに対してチェックを実行：
+
+```bash
+pre-commit run --files <file1> <file2>
+```
+
+#### チェックをスキップする（緊急時のみ）
+
+```bash
+git commit --no-verify
+```
+
+### テストの実行
+
+```bash
+pytest tests/ -v --cov=. --cov-report=term-missing
+```
+
+カバレッジレポートは `htmlcov/index.html` で確認できます。
+
 ## ライセンス
 
 MIT License
