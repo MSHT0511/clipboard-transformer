@@ -51,4 +51,6 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=None,  # アイコンファイルがあればここに指定
+    uac_admin=True,  # 管理者権限を要求
+    uac_uiaccess=False,  # UIアクセス権限は不要
 )
