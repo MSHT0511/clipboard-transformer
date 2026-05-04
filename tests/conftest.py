@@ -4,7 +4,6 @@ pytest設定ファイル
 共通のフィクスチャやテスト設定を定義
 """
 
-import pytest
 import sys
 from pathlib import Path
 

@@ -2,17 +2,20 @@
 通知音機能のテスト
 """
 
-import pytest
 import json
-import tempfile
 import os
+import tempfile
 from unittest.mock import Mock, patch
+
+import pytest
+
 from config import Config
 from main import ClipboardTransformerApp
 
 # winotify が利用可能かチェック
 try:
     from winotify import audio
+
     NOTIFICATION_AVAILABLE = True
 except ImportError:
     NOTIFICATION_AVAILABLE = False
@@ -24,13 +27,9 @@ class TestNotificationSound:
     @pytest.fixture
     def temp_config(self):
         """テスト用の一時設定ファイルを作成"""
-        config_data = {
-            "enabled": True,
-            "notification_sound": "Default",
-            "rules": []
-        }
+        config_data = {"enabled": True, "notification_sound": "Default", "rules": []}
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as f:
             json.dump(config_data, f)
             temp_file = f.name
 
@@ -42,7 +41,7 @@ class TestNotificationSound:
     @pytest.mark.skipif(not NOTIFICATION_AVAILABLE, reason="winotify not available")
     def test_get_audio_sound_default(self, temp_config):
         """デフォルト通知音の取得"""
-        with patch('main.KeyboardHook'):
+        with patch("main.KeyboardHook"):
             app = ClipboardTransformerApp()
             app.config = Config(temp_config)
             sound = app._get_audio_sound()
@@ -52,13 +51,13 @@ class TestNotificationSound:
     def test_get_audio_sound_mail(self, temp_config):
         """Mail通知音の取得"""
         # 設定ファイルを更新
-        with open(temp_config, 'r', encoding='utf-8') as f:
+        with open(temp_config, encoding="utf-8") as f:
             data = json.load(f)
         data["notification_sound"] = "Mail"
-        with open(temp_config, 'w', encoding='utf-8') as f:
+        with open(temp_config, "w", encoding="utf-8") as f:
             json.dump(data, f)
 
-        with patch('main.KeyboardHook'):
+        with patch("main.KeyboardHook"):
             app = ClipboardTransformerApp()
             app.config = Config(temp_config)
             sound = app._get_audio_sound()
@@ -69,13 +68,13 @@ class TestNotificationSound:
         """すべての有効な通知音を取得できることを確認"""
         for sound_name in Config.VALID_SOUNDS:
             # 設定ファイルを更新
-            with open(temp_config, 'r', encoding='utf-8') as f:
+            with open(temp_config, encoding="utf-8") as f:
                 data = json.load(f)
             data["notification_sound"] = sound_name
-            with open(temp_config, 'w', encoding='utf-8') as f:
+            with open(temp_config, "w", encoding="utf-8") as f:
                 json.dump(data, f)
 
-            with patch('main.KeyboardHook'):
+            with patch("main.KeyboardHook"):
                 app = ClipboardTransformerApp()
                 app.config = Config(temp_config)
                 sound = app._get_audio_sound()
@@ -86,13 +85,13 @@ class TestNotificationSound:
     def test_get_audio_sound_invalid_fallback(self, temp_config):
         """無効な通知音はデフォルトにフォールバック"""
         # 設定ファイルに無効な通知音を設定
-        with open(temp_config, 'r', encoding='utf-8') as f:
+        with open(temp_config, encoding="utf-8") as f:
             data = json.load(f)
         data["notification_sound"] = "InvalidSound"
-        with open(temp_config, 'w', encoding='utf-8') as f:
+        with open(temp_config, "w", encoding="utf-8") as f:
             json.dump(data, f)
 
-        with patch('main.KeyboardHook'):
+        with patch("main.KeyboardHook"):
             app = ClipboardTransformerApp()
             app.config = Config(temp_config)
             # Config クラスで無効な音は "Default" にフォールバックされる
@@ -102,7 +101,7 @@ class TestNotificationSound:
 
     def test_on_sound_selected_handler(self, temp_config):
         """通知音選択ハンドラのテスト"""
-        with patch('main.KeyboardHook'):
+        with patch("main.KeyboardHook"):
             app = ClipboardTransformerApp()
             app.config = Config(temp_config)
 
@@ -117,13 +116,13 @@ class TestNotificationSound:
             assert app.config.notification_sound == "SMS"
 
             # ファイルに保存されたか確認
-            with open(temp_config, 'r', encoding='utf-8') as f:
+            with open(temp_config, encoding="utf-8") as f:
                 data = json.load(f)
             assert data["notification_sound"] == "SMS"
 
     def test_is_sound_checked(self, temp_config):
         """通知音のチェック状態確認テスト"""
-        with patch('main.KeyboardHook'):
+        with patch("main.KeyboardHook"):
             app = ClipboardTransformerApp()
             app.config = Config(temp_config)
             app.config.notification_sound = "Reminder"
@@ -138,7 +137,7 @@ class TestNotificationSound:
 
     def test_menu_items_include_sound_menu(self, temp_config):
         """メニューに通知音選択が含まれることを確認"""
-        with patch('main.KeyboardHook'):
+        with patch("main.KeyboardHook"):
             app = ClipboardTransformerApp()
             app.config = Config(temp_config)
 
