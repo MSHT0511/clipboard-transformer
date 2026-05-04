@@ -5,9 +5,17 @@
 import json
 import logging
 import os
+import sys
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+def get_base_dir() -> str:
+    """PyInstaller バンドル時は _MEIPASS、通常時はスクリプトのディレクトリを返す"""
+    if getattr(sys, "frozen", False):
+        return sys._MEIPASS  # type: ignore[attr-defined]
+    return os.path.dirname(os.path.abspath(__file__))
 
 
 class Config:
@@ -17,7 +25,9 @@ class Config:
 
     VALID_SOUNDS = ["Default", "IM", "Mail", "Reminder", "SMS", "Silent"]
 
-    def __init__(self, config_path: str = "config.json"):
+    def __init__(self, config_path: str | None = None):
+        if config_path is None:
+            config_path = os.path.join(get_base_dir(), "config.json")
         self.config_path = config_path
         self.enabled = True
         self.notification_sound = "Default"
