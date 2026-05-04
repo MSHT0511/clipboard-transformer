@@ -392,6 +392,164 @@ class TestOnQuit:
         mock_hook.stop.assert_called_once()
 
 
+class TestOnOpenLog:
+    """_on_open_log() のテスト"""
+    
+    @patch('main.KeyboardHook')
+    @patch('main.os.startfile')
+    @patch('main.Path')
+    def test_open_log_success(self, mock_path_class, mock_startfile, mock_hook_class):
+        """ログファイルが存在する場合、正常に開く"""
+        app = ClipboardTransformerApp()
+        
+        mock_icon = Mock()
+        mock_item = Mock()
+        
+        # ログファイルが存在する
+        mock_log_path = Mock()
+        mock_log_path.exists.return_value = True
+        mock_log_path.resolve.return_value = mock_log_path
+        mock_path_class.return_value = mock_log_path
+        
+        app._on_open_log(mock_icon, mock_item)
+        
+        # os.startfile が呼ばれた
+        mock_startfile.assert_called_once()
+        # 通知は表示されない
+        mock_icon.notify.assert_not_called()
+    
+    @patch('main.KeyboardHook')
+    @patch('main.os.startfile')
+    @patch('main.Path')
+    def test_open_log_not_found(self, mock_path_class, mock_startfile, mock_hook_class):
+        """ログファイルが存在しない場合、警告通知を表示"""
+        app = ClipboardTransformerApp()
+        
+        mock_icon = Mock()
+        mock_item = Mock()
+        
+        # ログファイルが存在しない
+        mock_log_path = Mock()
+        mock_log_path.exists.return_value = False
+        mock_log_path.resolve.return_value = mock_log_path
+        mock_path_class.return_value = mock_log_path
+        
+        app._on_open_log(mock_icon, mock_item)
+        
+        # os.startfile は呼ばれない
+        mock_startfile.assert_not_called()
+        # 警告通知が表示される
+        mock_icon.notify.assert_called_once()
+        assert "not found" in mock_icon.notify.call_args[0][0]
+    
+    @patch('main.KeyboardHook')
+    @patch('main.os.startfile')
+    @patch('main.Path')
+    def test_open_log_error(self, mock_path_class, mock_startfile, mock_hook_class):
+        """ログファイルを開く際にエラーが発生した場合、エラー通知を表示"""
+        app = ClipboardTransformerApp()
+        
+        mock_icon = Mock()
+        mock_item = Mock()
+        
+        # ログファイルは存在するが、startfileでエラー
+        mock_log_path = Mock()
+        mock_log_path.exists.return_value = True
+        mock_log_path.resolve.return_value = mock_log_path
+        mock_path_class.return_value = mock_log_path
+        mock_startfile.side_effect = Exception("Test error")
+        
+        app._on_open_log(mock_icon, mock_item)
+        
+        # エラー通知が表示される
+        mock_icon.notify.assert_called_once()
+        assert "Failed" in mock_icon.notify.call_args[0][0]
+
+
+class TestPlayPreviewSound:
+    """_play_preview_sound() と _on_preview_sound() のテスト"""
+    
+    @patch('main.KeyboardHook')
+    @patch('main.winsound.PlaySound')
+    @patch('main.winreg.OpenKey')
+    @patch('main.winreg.QueryValueEx')
+    @patch('main.winreg.CloseKey')
+    def test_play_preview_sound_success(self, mock_close, mock_query, mock_open, mock_play, mock_hook_class):
+        """サウンドプレビューが正常に再生される"""
+        app = ClipboardTransformerApp()
+        
+        # レジストリからサウンドファイルパスを取得
+        mock_key = Mock()
+        mock_open.return_value = mock_key
+        mock_query.return_value = ("C:\\Windows\\Media\\notify.wav", None)
+        
+        app._play_preview_sound("Default")
+        
+        # レジストリが開かれた
+        mock_open.assert_called_once()
+        mock_query.assert_called_once_with(mock_key, "")
+        mock_close.assert_called_once_with(mock_key)
+        
+        # winsound.PlaySound が呼ばれた
+        mock_play.assert_called_once()
+        call_args = mock_play.call_args[0]
+        assert call_args[0] == "C:\\Windows\\Media\\notify.wav"
+    
+    @patch('main.KeyboardHook')
+    @patch('main.winsound.PlaySound')
+    @patch('main.winsound.MessageBeep')
+    @patch('main.winreg.OpenKey')
+    @patch('main.winreg.QueryValueEx')
+    @patch('main.winreg.CloseKey')
+    def test_play_preview_sound_no_file(self, mock_close, mock_query, mock_open, mock_beep, mock_play, mock_hook_class):
+        """サウンドファイルが設定されていない場合、MessageBeepを再生"""
+        app = ClipboardTransformerApp()
+        
+        # レジストリにサウンドファイルパスが無い
+        mock_key = Mock()
+        mock_open.return_value = mock_key
+        mock_query.return_value = ("", None)
+        
+        app._play_preview_sound("Default")
+        
+        # winsound.PlaySound は呼ばれない
+        mock_play.assert_not_called()
+        # MessageBeep が呼ばれた
+        mock_beep.assert_called_once()
+    
+    @patch('main.KeyboardHook')
+    @patch('main.winsound.MessageBeep')
+    @patch('main.winreg.OpenKey')
+    def test_play_preview_sound_registry_error(self, mock_open, mock_beep, mock_hook_class):
+        """レジストリ読み取りエラー時、MessageBeepを再生"""
+        app = ClipboardTransformerApp()
+        
+        # レジストリアクセスエラー
+        mock_open.side_effect = FileNotFoundError("Registry key not found")
+        
+        app._play_preview_sound("InvalidSound")
+        
+        # MessageBeep が呼ばれた
+        mock_beep.assert_called_once()
+    
+    @patch('main.KeyboardHook')
+    def test_on_preview_sound_handler(self, mock_hook_class):
+        """_on_preview_sound() がコールバックを返し、呼び出し時にサウンドを再生"""
+        app = ClipboardTransformerApp()
+        
+        with patch.object(app, '_play_preview_sound') as mock_play:
+            # コールバックを取得
+            handler = app._on_preview_sound("Mail")
+            
+            # コールバックを実行
+            mock_icon = Mock()
+            mock_item = Mock()
+            handler(mock_icon, mock_item)
+            
+            # _play_preview_sound が呼ばれた
+            mock_play.assert_called_once_with("Mail")
+
+
 class TestGetMenuItems:
     """_get_menu_items() のテスト"""
     
@@ -403,8 +561,8 @@ class TestGetMenuItems:
         
         menu_items = app._get_menu_items()
         
-        # 4つのメニュー項目が返される
-        assert len(menu_items) == 4
+        # 5つのメニュー項目が返される（Enable/Disable, Notification Sound, Open Log File, Reload, Quit）
+        assert len(menu_items) == 5
         
         # 各項目が item オブジェクト
         for item_obj in menu_items:

@@ -5,7 +5,10 @@
 """
 
 import sys
+import os
 import logging
+import winsound
+import winreg
 from pathlib import Path
 from PIL import Image, ImageDraw
 import pystray
@@ -27,12 +30,15 @@ except ImportError:
     logger.warning("winotify not available, notifications will be disabled")
 
 
+# ログファイルのパス
+LOG_FILE_PATH = 'clipboard-transformer.log'
+
 # ログ設定
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('clipboard-transformer.log', encoding='utf-8'),
+        logging.FileHandler(LOG_FILE_PATH, encoding='utf-8'),
         logging.StreamHandler(sys.stdout)
     ]
 )
@@ -162,6 +168,64 @@ class ClipboardTransformerApp:
         def checker(item):
             return self.config.notification_sound == sound_name
         return checker
+
+    def _play_preview_sound(self, sound_name):
+        """指定されたシステム通知音をプレビュー再生する（通知を表示しない）"""
+        sound_mapping = {
+            "Default": ".Default",
+            "IM": "Notification.IM",
+            "Mail": "Notification.Mail",
+            "Reminder": "Notification.Reminder",
+            "SMS": "Notification.SMS"
+        }
+        
+        registry_path = sound_mapping.get(sound_name, ".Default")
+        
+        try:
+            # レジストリからサウンドファイルのパスを取得
+            key_path = f"AppEvents\\Schemes\\Apps\\.Default\\{registry_path}\\.Current"
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path)
+            sound_file, _ = winreg.QueryValueEx(key, "")
+            winreg.CloseKey(key)
+            
+            if sound_file:
+                # 非同期で再生（SND_ASYNC: アプリケーションをブロックしない）
+                winsound.PlaySound(
+                    sound_file,
+                    winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT
+                )
+                logger.debug(f"Playing preview sound: {sound_file}")
+            else:
+                logger.warning(f"No sound file found for {sound_name}")
+                winsound.MessageBeep(winsound.MB_OK)
+        except FileNotFoundError:
+            logger.warning(f"Sound registry key not found for {sound_name}")
+            winsound.MessageBeep(winsound.MB_OK)
+        except Exception as e:
+            logger.error(f"Error playing sound {sound_name}: {e}")
+            winsound.MessageBeep(winsound.MB_OK)
+
+    def _on_preview_sound(self, sound_name):
+        """サウンドプレビューが選択された時のハンドラを返す"""
+        def handler(icon, item):
+            logger.info(f"Previewing sound: {sound_name}")
+            self._play_preview_sound(sound_name)
+        return handler
+
+    def _on_open_log(self, icon, item):
+        """ログファイルを開く"""
+        log_path = Path(LOG_FILE_PATH).resolve()
+        try:
+            if log_path.exists():
+                os.startfile(str(log_path))
+                logger.info(f"Opening log file: {log_path}")
+            else:
+                logger.warning(f"Log file not found: {log_path}")
+                icon.notify("Log file not found", "Clipboard Transformer")
+        except Exception as e:
+            logger.error(f"Failed to open log file: {e}")
+            icon.notify(f"Failed to open log file: {e}", "Clipboard Transformer")
+
     def _on_reload(self, icon, item):
         """設定の再読み込み"""
         logger.info("Reloading configuration...")
@@ -178,17 +242,28 @@ class ClipboardTransformerApp:
 
     def _get_menu_items(self):
         """システムトレイのメニュー項目を生成"""
-        sound_menu = pystray.Menu(
-            *[
+        # サウンドメニューの項目を生成（各サウンドとそのプレビュー）
+        sound_items = []
+        for sound_name in Config.VALID_SOUNDS:
+            # サウンド選択項目（ラジオボタン）
+            sound_items.append(
                 item(
                     sound_name,
                     self._on_sound_selected(sound_name),
                     checked=self._is_sound_checked(sound_name),
                     radio=True
                 )
-                for sound_name in Config.VALID_SOUNDS
-            ]
-        )
+            )
+            # プレビュー項目（Silentを除く）
+            if sound_name != "Silent":
+                sound_items.append(
+                    item(
+                        f"  {sound_name} (プレビュー)",
+                        self._on_preview_sound(sound_name)
+                    )
+                )
+        
+        sound_menu = pystray.Menu(*sound_items)
 
         return (
             item(
@@ -196,6 +271,7 @@ class ClipboardTransformerApp:
                 self._on_toggle
             ),
             item('Notification Sound', sound_menu),
+            item('Open Log File', self._on_open_log),
             item('Reload Config', self._on_reload),
             item('Quit', self._on_quit)
         )
