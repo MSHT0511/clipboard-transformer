@@ -20,7 +20,7 @@ from PIL import Image, ImageDraw
 from pystray import MenuItem
 
 from clipboard_util import get_text, has_text, set_text
-from config import Config
+from config import Config, get_base_dir
 from hook import KeyboardHook
 from transformer import Transformer
 
@@ -272,7 +272,7 @@ class ClipboardTransformerApp:
         logger.info("Starting Clipboard Transformer...")
 
         # 設定ファイルが無い場合はサンプルを作成
-        if not Path("config.json").exists():
+        if not Path(get_base_dir(), "config.json").exists():
             logger.info("Config file not found, creating sample config...")
             self.config.save_default_config()
             self.config.reload()

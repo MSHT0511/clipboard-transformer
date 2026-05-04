@@ -1,17 +1,16 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-block_cipher = None
-
 a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('config.json', '.')],  # config.jsonを同梱
+    datas=[('config.json', '.'), ('assets/icon.ico', 'assets')],  # config.jsonとアイコンを同梱
     hiddenimports=[
         'win32timezone',
-        'win32gui',
+        'win32clipboard',
         'win32con',
         'win32api',
+        'win32event',
         'pywintypes',
         'winotify',
         'keyboard',
@@ -24,11 +23,10 @@ a = Analysis(
     excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
-    cipher=block_cipher,
     noarchive=False,
 )
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure, a.zipped_data)
 
 exe = EXE(
     pyz,
@@ -50,7 +48,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,  # アイコンファイルがあればここに指定
+    icon='assets/icon.ico',
     uac_admin=True,  # 管理者権限を要求
     uac_uiaccess=False,  # UIアクセス権限は不要
 )
