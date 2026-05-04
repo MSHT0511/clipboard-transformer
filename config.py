@@ -5,7 +5,7 @@
 import json
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +110,7 @@ class Config:
         """機能が有効かどうかを返す"""
         return self.enabled
 
-    def get_rules(self) -> List[Dict[str, Any]]:
+    def get_rules(self) -> list[dict[str, Any]]:
         """ルールリストを返す"""
         return self.rules
 

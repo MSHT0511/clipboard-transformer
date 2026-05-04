@@ -47,4 +47,4 @@ jobs:
         pip install bandit
 
     - name: Run Bandit security scan
-      run: bandit -r . -ll --exclude ./venv,./build,./htmlcov
+      run: bandit -r *.py tests/ -ll

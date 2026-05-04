@@ -247,9 +247,10 @@ class TestSoundHandlers:
         mock_icon = Mock()
         mock_item = Mock()
 
-        with patch.object(app.config, "save") as mock_save, patch.object(
-            app, "_play_preview_sound"
-        ) as mock_play_preview:
+        with (
+            patch.object(app.config, "save") as mock_save,
+            patch.object(app, "_play_preview_sound") as mock_play_preview,
+        ):
             handler(mock_icon, mock_item)
 
         # 通知音が変更され、保存された
@@ -271,9 +272,10 @@ class TestSoundHandlers:
         mock_icon = Mock()
         mock_item = Mock()
 
-        with patch.object(app.config, "save") as mock_save, patch.object(
-            app, "_play_preview_sound"
-        ) as mock_play_preview:
+        with (
+            patch.object(app.config, "save") as mock_save,
+            patch.object(app, "_play_preview_sound") as mock_play_preview,
+        ):
             handler(mock_icon, mock_item)
 
         # 通知音が変更された
@@ -584,9 +586,10 @@ class TestRun:
 
         app = ClipboardTransformerApp()
 
-        with patch.object(app.config, "save_default_config") as mock_save_default, patch.object(
-            app.config, "reload"
-        ) as mock_reload:
+        with (
+            patch.object(app.config, "save_default_config") as mock_save_default,
+            patch.object(app.config, "reload") as mock_reload,
+        ):
             app.run()
 
             # デフォルト設定が作成され、再読み込みされた

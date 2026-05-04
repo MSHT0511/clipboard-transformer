@@ -77,11 +77,13 @@ exclude_lines = [
 line-length = 120
 target-version = "py310"
 exclude = [
+    ".git",
+    ".pytest_cache",
+    "__pycache__",
     "venv",
     "build",
     "dist",
     "htmlcov",
-    ".pytest_cache",
 ]
 
 [tool.ruff.lint]
@@ -105,5 +107,5 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.bandit]
-exclude_dirs = ["tests", "venv", "build", "dist"]
+exclude_dirs = [".git", ".pytest_cache", "__pycache__", "tests", "venv", "build", "dist", "htmlcov"]
 skips = ["B101"]  # Skip assert_used check for tests

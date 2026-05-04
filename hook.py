@@ -8,7 +8,7 @@ keyboard ライブラリを使用して Ctrl+V を検知し、
 
 import logging
 import time
-from typing import Callable, Optional
+from collections.abc import Callable
 
 import keyboard
 
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class KeyboardHook:
     """Ctrl+V をフックして変換処理を実行するクラス"""
 
-    def __init__(self, on_paste_callback: Optional[Callable[[], bool]] = None):
+    def __init__(self, on_paste_callback: Callable[[], bool] | None = None):
         """
         Args:
             on_paste_callback: Ctrl+V 検知時に呼ばれるコールバック関数。
