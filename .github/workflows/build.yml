@@ -4,6 +4,10 @@ on:
   push:
     tags:
       - 'v*'
+    branches:
+      - main
+    paths-ignore:
+      - 'tests/**'
   workflow_dispatch:
 
 jobs:
@@ -11,10 +15,10 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
@@ -31,24 +35,24 @@ jobs:
     - name: Create release package
       run: |
         mkdir release
-        copy dist\ClipboardTransformer.exe release\
+        copy dist\ClipboardTransformer.exe "release\ClipboardTransformer-build${{ github.run_number }}.exe"
         copy config.json release\
         copy README.md release\
         copy EXE_USAGE.md release\
         copy LICENSE release\
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ClipboardTransformer-Windows
         path: release/
 
     - name: Create Release
       if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: |
-          release/ClipboardTransformer.exe
+          release/ClipboardTransformer-build${{ github.run_number }}.exe
           release/config.json
           release/README.md
           release/EXE_USAGE.md
