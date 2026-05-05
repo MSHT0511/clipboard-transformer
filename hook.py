@@ -14,6 +14,11 @@ import keyboard
 
 logger = logging.getLogger(__name__)
 
+# 定数
+HOTKEY_CTRL_V = "ctrl+v"
+KEY_PRESS_DELAY = 0.01  # キープレス後の待機時間（秒）
+KEY_RELEASE_DELAY = 0.05  # キーリリース後の待機時間（秒）
+
 
 class KeyboardHook:
     """Ctrl+V をフックして変換処理を実行するクラス"""
@@ -38,7 +43,7 @@ class KeyboardHook:
 
         try:
             # Ctrl+V のホットキーを登録（suppress=True で元のイベントを抑制）
-            keyboard.add_hotkey("ctrl+v", self._on_hotkey_triggered, suppress=True)
+            keyboard.add_hotkey(HOTKEY_CTRL_V, self._on_hotkey_triggered, suppress=True)
             self._hook_active = True
             logger.info("Keyboard hook started")
 
@@ -67,14 +72,7 @@ class KeyboardHook:
         # 機能が無効の場合はスキップ
         if not self.enabled:
             # 機能が無効の時は元のCtrl+Vを実行
-            self._prevent_recursion = True
-            keyboard.press("ctrl")
-            keyboard.press("v")
-            time.sleep(0.01)
-            keyboard.release("v")
-            keyboard.release("ctrl")
-            time.sleep(0.05)
-            self._prevent_recursion = False
+            self.simulate_paste()
             return
 
         logger.debug("Ctrl+V detected")
@@ -84,14 +82,7 @@ class KeyboardHook:
             try:
                 # コールバックが False を返したら、元のCtrl+Vを実行
                 if not self.on_paste_callback():
-                    self._prevent_recursion = True
-                    keyboard.press("ctrl")
-                    keyboard.press("v")
-                    time.sleep(0.01)
-                    keyboard.release("v")
-                    keyboard.release("ctrl")
-                    time.sleep(0.05)
-                    self._prevent_recursion = False
+                    self.simulate_paste()
 
             except Exception as e:
                 logger.error(f"Error in paste callback: {e}")
@@ -106,12 +97,12 @@ class KeyboardHook:
             # Ctrl+V を送信
             keyboard.press("ctrl")
             keyboard.press("v")
-            time.sleep(0.01)
+            time.sleep(KEY_PRESS_DELAY)
             keyboard.release("v")
             keyboard.release("ctrl")
 
             # 短い待機時間を置いてからフラグを解除
-            time.sleep(0.05)
+            time.sleep(KEY_RELEASE_DELAY)
 
         except Exception as e:
             logger.error(f"Failed to simulate paste: {e}")
