@@ -220,7 +220,7 @@ class ClipboardTransformerApp:
         log_path = Path(LOG_FILE_PATH).resolve()
         try:
             if log_path.exists():
-                os.startfile(str(log_path))
+                os.startfile(str(log_path))  # nosec B606 - Safe: opens only controlled log file path
                 logger.info(f"Opening log file: {log_path}")
             else:
                 logger.warning(f"Log file not found: {log_path}")
@@ -228,6 +228,20 @@ class ClipboardTransformerApp:
         except Exception as e:
             logger.error(f"Failed to open log file: {e}")
             icon.notify(f"Failed to open log file: {e}", "Clipboard Transformer")
+
+    def _on_open_config(self, icon, item):
+        """設定ファイルを開く"""
+        config_path = Path(get_base_dir(), "config.json").resolve()
+        try:
+            if config_path.exists():
+                os.startfile(str(config_path))  # nosec B606 - Safe: opens only controlled config file path
+                logger.info(f"Opening config file: {config_path}")
+            else:
+                logger.warning(f"Config file not found: {config_path}")
+                icon.notify("Config file not found", "Clipboard Transformer")
+        except Exception as e:
+            logger.error(f"Failed to open config file: {e}")
+            icon.notify(f"Failed to open config file: {e}", "Clipboard Transformer")
 
     def _on_reload(self, icon, item):
         """設定の再読み込み"""
@@ -263,6 +277,7 @@ class ClipboardTransformerApp:
             ),
             MenuItem("Notification Sound", sound_menu),
             MenuItem("Open Log File", self._on_open_log),
+            MenuItem("Open Config File", self._on_open_config),
             MenuItem("Reload Config", self._on_reload),
             MenuItem("Quit", self._on_quit),
         )
