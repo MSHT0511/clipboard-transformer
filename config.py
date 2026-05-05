@@ -10,6 +10,17 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# 定数
+RULE_TYPE_LITERAL = "literal"
+RULE_TYPE_REGEX = "regex"
+FIELD_NAME = "name"
+FIELD_TYPE = "type"
+FIELD_FROM = "from"
+FIELD_TO = "to"
+FIELD_PATTERN = "pattern"
+FIELD_REPLACEMENT = "replacement"
+FIELD_ENABLED = "enabled"
+
 
 def get_base_dir() -> str:
     """PyInstaller バンドル時は _MEIPASS、通常時はスクリプトのディレクトリを返す"""
@@ -80,34 +91,48 @@ class Config:
         self.notification_sound = self.DEFAULT_CONFIG["notification_sound"]
         self.rules = self.DEFAULT_CONFIG["rules"]
 
+    def _is_valid_rule(self, rule: Any, index: int) -> bool:
+        """
+        単一のルールが妥当かどうかをチェックする
+
+        Args:
+            rule: チェック対象のルール
+            index: ルールのインデックス（エラーメッセージ用）
+
+        Returns:
+            bool: ルールが妥当な場合 True
+        """
+        if not isinstance(rule, dict):
+            logger.warning(f"Rule #{index} is not an object, skipping")
+            return False
+
+        rule_type = rule.get(FIELD_TYPE)
+        if rule_type not in [RULE_TYPE_LITERAL, RULE_TYPE_REGEX]:
+            logger.warning(f"Rule #{index} has invalid type '{rule_type}', skipping")
+            return False
+
+        name = rule.get(FIELD_NAME, f"rule-{index}")
+
+        # literal タイプのバリデーション
+        if rule_type == RULE_TYPE_LITERAL:
+            if FIELD_FROM not in rule or FIELD_TO not in rule:
+                logger.warning(f"Literal rule '{name}' missing 'from' or 'to', skipping")
+                return False
+
+        # regex タイプのバリデーション
+        elif rule_type == RULE_TYPE_REGEX and (FIELD_PATTERN not in rule or FIELD_REPLACEMENT not in rule):
+            logger.warning(f"Regex rule '{name}' missing 'pattern' or 'replacement', skipping")
+            return False
+
+        return True
+
     def _validate_rules(self):
         """ルールの妥当性をチェック"""
         valid_rules = []
 
         for i, rule in enumerate(self.rules):
-            if not isinstance(rule, dict):
-                logger.warning(f"Rule #{i} is not an object, skipping")
-                continue
-
-            rule_type = rule.get("type")
-            if rule_type not in ["literal", "regex"]:
-                logger.warning(f"Rule #{i} has invalid type '{rule_type}', skipping")
-                continue
-
-            name = rule.get("name", f"rule-{i}")
-
-            # literal タイプのバリデーション
-            if rule_type == "literal":
-                if "from" not in rule or "to" not in rule:
-                    logger.warning(f"Literal rule '{name}' missing 'from' or 'to', skipping")
-                    continue
-
-            # regex タイプのバリデーション
-            elif rule_type == "regex" and ("pattern" not in rule or "replacement" not in rule):
-                logger.warning(f"Regex rule '{name}' missing 'pattern' or 'replacement', skipping")
-                continue
-
-            valid_rules.append(rule)
+            if self._is_valid_rule(rule, i):
+                valid_rules.append(rule)
 
         self.rules = valid_rules
 
@@ -127,15 +152,21 @@ class Config:
     def save_default_config(self):
         """デフォルトのサンプル設定ファイルを作成"""
         sample_config = {
-            "enabled": True,
+            FIELD_ENABLED: True,
             "rules": [
-                {"name": "example-literal", "type": "literal", "from": "旧文字列", "to": "新文字列", "enabled": True},
                 {
-                    "name": "remove-dates",
-                    "type": "regex",
-                    "pattern": "\\d{4}-\\d{2}-\\d{2}",
-                    "replacement": "DATE_REMOVED",
-                    "enabled": True,
+                    FIELD_NAME: "example-literal",
+                    FIELD_TYPE: RULE_TYPE_LITERAL,
+                    FIELD_FROM: "旧文字列",
+                    FIELD_TO: "新文字列",
+                    FIELD_ENABLED: True,
+                },
+                {
+                    FIELD_NAME: "remove-dates",
+                    FIELD_TYPE: RULE_TYPE_REGEX,
+                    FIELD_PATTERN: "\\d{4}-\\d{2}-\\d{2}",
+                    FIELD_REPLACEMENT: "DATE_REMOVED",
+                    FIELD_ENABLED: True,
                 },
             ],
         }

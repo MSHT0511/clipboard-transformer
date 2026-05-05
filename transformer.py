@@ -10,6 +10,17 @@ import re
 
 logger = logging.getLogger(__name__)
 
+# 定数
+RULE_TYPE_LITERAL = "literal"
+RULE_TYPE_REGEX = "regex"
+FIELD_TYPE = "type"
+FIELD_NAME = "name"
+FIELD_ENABLED = "enabled"
+FIELD_FROM = "from"
+FIELD_TO = "to"
+FIELD_PATTERN = "pattern"
+FIELD_REPLACEMENT = "replacement"
+
 
 class TransformationRule:
     """変換ルールの基底クラス"""
@@ -88,32 +99,46 @@ class Transformer:
                     logger.error(f"Error applying rule '{rule.name}': {e}")
         return result
 
+    def _create_rule_from_config(self, rule_config: dict) -> TransformationRule | None:
+        """
+        設定辞書から単一のルールを作成する
+
+        Args:
+            rule_config: ルール設定の辞書
+
+        Returns:
+            TransformationRule | None: 作成されたルール、またはエラーの場合は None
+        """
+        try:
+            rule_type = rule_config.get(FIELD_TYPE)
+            name = rule_config.get(FIELD_NAME, "unnamed")
+            enabled = rule_config.get(FIELD_ENABLED, True)
+
+            if rule_type == RULE_TYPE_LITERAL:
+                from_str = rule_config.get(FIELD_FROM, "")
+                to_str = rule_config.get(FIELD_TO, "")
+                logger.info(f"Loaded literal rule: {name}")
+                return LiteralRule(name, from_str, to_str, enabled)
+
+            elif rule_type == RULE_TYPE_REGEX:
+                pattern = rule_config.get(FIELD_PATTERN, "")
+                replacement = rule_config.get(FIELD_REPLACEMENT, "")
+                logger.info(f"Loaded regex rule: {name}")
+                return RegexRule(name, pattern, replacement, enabled)
+
+            else:
+                logger.warning(f"Unknown rule type '{rule_type}' for rule '{name}'")
+                return None
+
+        except Exception as e:
+            logger.error(f"Error creating rule: {e}")
+            return None
+
     def load_rules_from_config(self, rules_config: list):
         """設定リストからルールを読み込む"""
         self.clear_rules()
 
         for rule_config in rules_config:
-            try:
-                rule_type = rule_config.get("type")
-                name = rule_config.get("name", "unnamed")
-                enabled = rule_config.get("enabled", True)
-
-                if rule_type == "literal":
-                    from_str = rule_config.get("from", "")
-                    to_str = rule_config.get("to", "")
-                    rule = LiteralRule(name, from_str, to_str, enabled)
-                    self.add_rule(rule)
-                    logger.info(f"Loaded literal rule: {name}")
-
-                elif rule_type == "regex":
-                    pattern = rule_config.get("pattern", "")
-                    replacement = rule_config.get("replacement", "")
-                    rule = RegexRule(name, pattern, replacement, enabled)
-                    self.add_rule(rule)
-                    logger.info(f"Loaded regex rule: {name}")
-
-                else:
-                    logger.warning(f"Unknown rule type '{rule_type}' for rule '{name}'")
-
-            except Exception as e:
-                logger.error(f"Error loading rule: {e}")
+            rule = self._create_rule_from_config(rule_config)
+            if rule is not None:
+                self.add_rule(rule)

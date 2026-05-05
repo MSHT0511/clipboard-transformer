@@ -5,6 +5,8 @@ import os
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from config import Config
 from transformer import Transformer
 
@@ -184,20 +186,20 @@ class TestConfig:
         finally:
             os.unlink(temp_file)
 
-    def test_notification_sound_all_valid_sounds(self):
+    @pytest.mark.parametrize("sound", Config.VALID_SOUNDS)
+    def test_notification_sound_all_valid_sounds(self, sound):
         """すべての有効な通知音を読み込めることを確認"""
-        for sound in Config.VALID_SOUNDS:
-            config_data = {"enabled": True, "notification_sound": sound, "rules": []}
+        config_data = {"enabled": True, "notification_sound": sound, "rules": []}
 
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as f:
-                json.dump(config_data, f)
-                temp_file = f.name
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as f:
+            json.dump(config_data, f)
+            temp_file = f.name
 
-            try:
-                config = Config(temp_file)
-                assert config.notification_sound == sound
-            finally:
-                os.unlink(temp_file)
+        try:
+            config = Config(temp_file)
+            assert config.notification_sound == sound
+        finally:
+            os.unlink(temp_file)
 
     def test_config_save(self):
         """Config.save() メソッドのテスト"""

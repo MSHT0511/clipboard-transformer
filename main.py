@@ -24,6 +24,9 @@ from config import Config, get_base_dir
 from hook import KeyboardHook
 from transformer import Transformer
 
+# 定数
+MB_ICONINFORMATION = 0x40  # MessageBoxW のアイコンフラグ
+
 # Windows通知用
 try:
     from winotify import Notification, audio
@@ -329,7 +332,7 @@ def main():
                 0,
                 "Clipboard Transformer は既に起動しています。\n\nシステムトレイのアイコンを確認してください。",
                 "Clipboard Transformer",
-                0x40,  # MB_ICONINFORMATION
+                MB_ICONINFORMATION,
             )
             sys.exit(1)
 
