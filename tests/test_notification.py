@@ -143,8 +143,8 @@ class TestNotificationSound:
 
             menu_items = app._get_menu_items()
 
-            # メニュー項目が5つあることを確認（Enable/Disable, Notification Sound, Open Log File, Reload, Quit）
-            assert len(menu_items) == 5
+            # メニュー項目が6つあることを確認（Enable/Disable, Notification Sound, Open Log File, Open Config File, Reload, Quit）
+            assert len(menu_items) == 6
 
             # 2番目の項目が "Notification Sound" であることを確認
             # （pystray の MenuItem オブジェクトなので詳細は確認しにくいが、少なくとも存在することを確認）
