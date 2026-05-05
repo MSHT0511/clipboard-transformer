@@ -455,6 +455,94 @@ class TestOnOpenLog:
         assert "Failed" in mock_icon.notify.call_args[0][0]
 
 
+class TestOnOpenConfig:
+    """_on_open_config() のテスト"""
+
+    @patch("main.KeyboardHook")
+    @patch("main.os.startfile")
+    @patch("main.Path")
+    @patch("main.get_base_dir")
+    def test_open_config_success(self, mock_get_base_dir, mock_path_class, mock_startfile, mock_hook_class):
+        """設定ファイルが存在する場合、正常に開く"""
+        app = ClipboardTransformerApp()
+
+        mock_icon = Mock()
+        mock_item = Mock()
+
+        # get_base_dir をモック
+        mock_get_base_dir.return_value = "/fake/base/dir"
+
+        # 設定ファイルが存在する
+        mock_config_path = Mock()
+        mock_config_path.exists.return_value = True
+        mock_config_path.resolve.return_value = mock_config_path
+        mock_path_class.return_value = mock_config_path
+
+        app._on_open_config(mock_icon, mock_item)
+
+        # Path が正しい引数で呼ばれた
+        mock_path_class.assert_called_once_with("/fake/base/dir", "config.json")
+        # os.startfile が呼ばれた
+        mock_startfile.assert_called_once()
+        # 通知は表示されない
+        mock_icon.notify.assert_not_called()
+
+    @patch("main.KeyboardHook")
+    @patch("main.os.startfile")
+    @patch("main.Path")
+    @patch("main.get_base_dir")
+    def test_open_config_not_found(self, mock_get_base_dir, mock_path_class, mock_startfile, mock_hook_class):
+        """設定ファイルが存在しない場合、警告通知を表示"""
+        app = ClipboardTransformerApp()
+
+        mock_icon = Mock()
+        mock_item = Mock()
+
+        # get_base_dir をモック
+        mock_get_base_dir.return_value = "/fake/base/dir"
+
+        # 設定ファイルが存在しない
+        mock_config_path = Mock()
+        mock_config_path.exists.return_value = False
+        mock_config_path.resolve.return_value = mock_config_path
+        mock_path_class.return_value = mock_config_path
+
+        app._on_open_config(mock_icon, mock_item)
+
+        # os.startfile は呼ばれない
+        mock_startfile.assert_not_called()
+        # 警告通知が表示される
+        mock_icon.notify.assert_called_once()
+        assert "not found" in mock_icon.notify.call_args[0][0]
+
+    @patch("main.KeyboardHook")
+    @patch("main.os.startfile")
+    @patch("main.Path")
+    @patch("main.get_base_dir")
+    def test_open_config_error(self, mock_get_base_dir, mock_path_class, mock_startfile, mock_hook_class):
+        """設定ファイルを開く際にエラーが発生した場合、エラー通知を表示"""
+        app = ClipboardTransformerApp()
+
+        mock_icon = Mock()
+        mock_item = Mock()
+
+        # get_base_dir をモック
+        mock_get_base_dir.return_value = "/fake/base/dir"
+
+        # 設定ファイルは存在するが、startfileでエラー
+        mock_config_path = Mock()
+        mock_config_path.exists.return_value = True
+        mock_config_path.resolve.return_value = mock_config_path
+        mock_path_class.return_value = mock_config_path
+        mock_startfile.side_effect = Exception("Test error")
+
+        app._on_open_config(mock_icon, mock_item)
+
+        # エラー通知が表示される
+        mock_icon.notify.assert_called_once()
+        assert "Failed" in mock_icon.notify.call_args[0][0]
+
+
 class TestPlayPreviewSound:
     """_play_preview_sound() と _on_preview_sound() のテスト"""
 
@@ -533,8 +621,8 @@ class TestGetMenuItems:
 
         menu_items = app._get_menu_items()
 
-        # 5つのメニュー項目が返される（Enable/Disable, Notification Sound, Open Log File, Reload, Quit）
-        assert len(menu_items) == 5
+        # 6つのメニュー項目が返される（Enable/Disable, Notification Sound, Open Log File, Open Config File, Reload, Quit）
+        assert len(menu_items) == 6
 
         # 各項目が item オブジェクト
         for item_obj in menu_items:
