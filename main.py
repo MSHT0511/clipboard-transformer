@@ -22,11 +22,20 @@ from pystray import MenuItem
 
 from clipboard_util import get_text, has_text, set_text
 from config import Config, get_base_dir
+from constants import (
+    ICON_COLOR_DISABLED,
+    ICON_COLOR_ENABLED,
+    ICON_SIZE,
+    ICON_TEXT,
+    ICON_TEXT_COLOR,
+    ICON_TEXT_POSITION,
+    LOG_FILE_BACKUP_COUNT,
+    LOG_FILE_MAX_BYTES,
+    LOG_FILE_PATH,
+    MB_ICONINFORMATION,
+)
 from hook import KeyboardHook
 from transformer import Transformer
-
-# 定数
-MB_ICONINFORMATION = 0x40  # MessageBoxW のアイコンフラグ
 
 # Windows通知用
 try:
@@ -38,11 +47,6 @@ except ImportError:  # pragma: no cover
     logger = logging.getLogger(__name__)
     logger.warning("winotify not available, notifications will be disabled")
 
-
-# ログファイルのパス
-LOG_FILE_PATH = "clipboard-transformer.log"
-LOG_FILE_MAX_BYTES = 5 * 1024 * 1024  # 5MB
-LOG_FILE_BACKUP_COUNT = 3  # 3世代保持
 
 # ログ設定
 logging.basicConfig(
@@ -152,18 +156,18 @@ class ClipboardTransformerApp:
 
     def _create_icon_image(self, enabled=True):
         """システムトレイアイコン用の画像を生成"""
-        # シンプルな 64x64 のアイコンを作成
-        width = 64
-        height = 64
+        # シンプルなアイコンを作成
+        width = ICON_SIZE
+        height = ICON_SIZE
         image = Image.new("RGB", (width, height), color="white")
         draw = ImageDraw.Draw(image)
 
         # 背景色を状態に応じて変更（有効=緑、無効=赤）
-        color = "green" if enabled else "red"
+        color = ICON_COLOR_ENABLED if enabled else ICON_COLOR_DISABLED
         draw.rectangle([0, 0, width, height], fill=color)
 
         # "CT" の文字を描画（Clipboard Transformer）
-        draw.text((10, 20), "CT", fill="white")
+        draw.text(ICON_TEXT_POSITION, ICON_TEXT, fill=ICON_TEXT_COLOR)
 
         return image
 

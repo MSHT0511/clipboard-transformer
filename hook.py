@@ -12,12 +12,9 @@ from collections.abc import Callable
 
 import keyboard
 
-logger = logging.getLogger(__name__)
+from constants import HOTKEY_CTRL_V, KEY_PRESS_DELAY, KEY_RELEASE_DELAY
 
-# 定数
-HOTKEY_CTRL_V = "ctrl+v"
-KEY_PRESS_DELAY = 0.01  # キープレス後の待機時間（秒）
-KEY_RELEASE_DELAY = 0.05  # キーリリース後の待機時間（秒）
+logger = logging.getLogger(__name__)
 
 
 class KeyboardHook:

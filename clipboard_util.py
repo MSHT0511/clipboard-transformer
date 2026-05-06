@@ -11,11 +11,9 @@ from contextlib import contextmanager
 import win32clipboard
 import win32con
 
-logger = logging.getLogger(__name__)
+from constants import CLIPBOARD_RETRY_COUNT, CLIPBOARD_RETRY_DELAY
 
-# 定数
-DEFAULT_RETRY_COUNT = 3  # クリップボード操作のデフォルトリトライ回数
-DEFAULT_RETRY_DELAY = 0.05  # リトライ間隔（秒）
+logger = logging.getLogger(__name__)
 
 
 @contextmanager
@@ -53,7 +51,7 @@ def get_text() -> str:
         return ""
 
 
-def set_text(text: str, retry_count: int = DEFAULT_RETRY_COUNT, retry_delay: float = DEFAULT_RETRY_DELAY) -> bool:
+def set_text(text: str, retry_count: int = CLIPBOARD_RETRY_COUNT, retry_delay: float = CLIPBOARD_RETRY_DELAY) -> bool:
     """
     クリップボードにテキストを設定する
 
