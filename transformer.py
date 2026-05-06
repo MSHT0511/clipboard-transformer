@@ -7,6 +7,7 @@ literal タイプと regex タイプの変換ルールをサポートし、
 
 import logging
 import re
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,9 @@ FIELD_FROM = "from"
 FIELD_TO = "to"
 FIELD_PATTERN = "pattern"
 FIELD_REPLACEMENT = "replacement"
+
+# ReDoS対策: 正規表現のタイムアウト（秒）
+REGEX_TIMEOUT = 2.0
 
 
 class TransformationRule:
@@ -65,7 +69,30 @@ class RegexRule(TransformationRule):
         if not self.enabled or self.compiled_pattern is None:
             return text
         try:
-            return self.compiled_pattern.sub(self.replacement, text)
+            # ReDoS対策: タイムアウト付きで正規表現を実行
+            result = [text]  # リストで結果を格納（スレッド間共有用）
+            exception = [None]  # 例外格納用
+
+            def regex_worker():
+                try:
+                    result[0] = self.compiled_pattern.sub(self.replacement, text)
+                except Exception as e:
+                    exception[0] = e
+
+            worker = threading.Thread(target=regex_worker, daemon=True)
+            worker.start()
+            worker.join(timeout=REGEX_TIMEOUT)
+
+            if worker.is_alive():
+                # タイムアウト発生
+                logger.error(f"Regex rule '{self.name}' timed out (possible ReDoS attack)")
+                return text
+
+            if exception[0]:
+                raise exception[0]
+
+            return result[0]
+
         except Exception as e:
             logger.error(f"Error applying regex rule '{self.name}': {e}")
             return text
@@ -134,11 +161,22 @@ class Transformer:
             logger.error(f"Error creating rule: {e}")
             return None
 
-    def load_rules_from_config(self, rules_config: list):
-        """設定リストからルールを読み込む"""
+    def load_rules_from_config(self, rules_config: list) -> list[str]:
+        """
+        設定リストからルールを読み込む
+
+        Returns:
+            list[str]: 無効な正規表現パターンを持つルール名のリスト
+        """
         self.clear_rules()
+        invalid_rules = []
 
         for rule_config in rules_config:
             rule = self._create_rule_from_config(rule_config)
             if rule is not None:
                 self.add_rule(rule)
+                # RegexRuleで無効なパターンがあるかチェック
+                if isinstance(rule, RegexRule) and rule.compiled_pattern is None:
+                    invalid_rules.append(rule.name)
+
+        return invalid_rules

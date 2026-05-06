@@ -10,6 +10,7 @@ import os
 import sys
 import winreg
 import winsound
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 import pystray
@@ -40,12 +41,19 @@ except ImportError:  # pragma: no cover
 
 # ログファイルのパス
 LOG_FILE_PATH = "clipboard-transformer.log"
+LOG_FILE_MAX_BYTES = 5 * 1024 * 1024  # 5MB
+LOG_FILE_BACKUP_COUNT = 3  # 3世代保持
 
 # ログ設定
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler(LOG_FILE_PATH, encoding="utf-8"), logging.StreamHandler(sys.stdout)],
+    handlers=[
+        RotatingFileHandler(
+            LOG_FILE_PATH, maxBytes=LOG_FILE_MAX_BYTES, backupCount=LOG_FILE_BACKUP_COUNT, encoding="utf-8"
+        ),
+        logging.StreamHandler(sys.stdout),
+    ],
 )
 
 logger = logging.getLogger(__name__)
@@ -66,8 +74,21 @@ class ClipboardTransformerApp:
     def _reload_rules(self):
         """設定ファイルからルールを再読み込み"""
         try:
-            self.transformer.load_rules_from_config(self.config.get_rules())
+            invalid_rules = self.transformer.load_rules_from_config(self.config.get_rules())
             logger.info(f"Loaded {len(self.transformer.rules)} transformation rules")
+
+            # 無効な正規表現ルールがあれば通知
+            if invalid_rules and NOTIFICATION_AVAILABLE:
+                rule_names = ", ".join([f"'{r}'" for r in invalid_rules])
+                toast = Notification(
+                    app_id="Clipboard Transformer",
+                    title="ルール読み込みエラー",
+                    msg=f"無効な正規表現パターン: {rule_names}",
+                    duration="long",
+                )
+                toast.set_audio(audio.Default, loop=False)
+                toast.show()
+                logger.warning(f"Notified user about {len(invalid_rules)} invalid regex rules")
         except Exception as e:
             logger.error(f"Failed to load rules: {e}")
 
@@ -105,6 +126,9 @@ class ClipboardTransformerApp:
         # 変換後のテキストをクリップボードにセット
         if not set_text(transformed_text):
             logger.error("Failed to set transformed text to clipboard")
+            # 失敗時は元のテキストをクリップボードに復元
+            logger.debug("Restoring original clipboard text")
+            set_text(original_text)
             return False
 
         logger.info("Text transformed and pasted")
