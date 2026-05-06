@@ -1,5 +1,5 @@
 keyboard~=0.13.5
-pywin32~=306
+pywin32>=306,<307
 pystray~=0.19.5
 Pillow>=12.2.0,<13.0.0
 winotify~=1.1.0
