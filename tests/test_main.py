@@ -128,6 +128,44 @@ class TestReloadRules:
         # エラー時はルールが変更されない（既存のルールが残る）
         assert len(app.transformer.rules) == initial_rule_count
 
+    @patch("main.NOTIFICATION_AVAILABLE", True)
+    @patch("main.Notification")
+    @patch("main.KeyboardHook")
+    def test_reload_rules_notifies_invalid_regex(self, mock_hook_class, mock_notification_class):
+        """無効な正規表現ルールがある場合に通知を表示"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as f:
+            config_data = {
+                "enabled": True,
+                "rules": [
+                    {"name": "valid-rule", "type": "literal", "from": "A", "to": "B"},
+                    {"name": "invalid-regex", "type": "regex", "pattern": r"(unclosed", "replacement": "X"},
+                ],
+            }
+            json.dump(config_data, f)
+            temp_file = f.name
+
+        try:
+            with patch("main.Config") as mock_config_class:
+                mock_config = Config(temp_file)
+                mock_config_class.return_value = mock_config
+
+                mock_notification = Mock()
+                mock_notification_class.return_value = mock_notification
+
+                app = ClipboardTransformerApp()  # noqa: F841  # 初期化時に_reload_rulesが呼ばれて通知が作成される
+
+                # 通知が作成された
+                mock_notification_class.assert_called_once()
+                call_kwargs = mock_notification_class.call_args[1]
+                assert call_kwargs["title"] == "ルール読み込みエラー"
+                assert "invalid-regex" in call_kwargs["msg"]
+                mock_notification.set_audio.assert_called_once()
+                mock_notification.show.assert_called_once()
+
+        finally:
+            if os.path.exists(temp_file):
+                os.unlink(temp_file)
+
 
 class TestCreateIconImage:
     """_create_icon_image() のテスト"""

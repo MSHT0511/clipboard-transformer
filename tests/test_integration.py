@@ -277,7 +277,7 @@ class TestOnPasteDetected:
     @patch("main.get_text", return_value="変換前テキスト")
     @patch("main.set_text", return_value=False)
     def test_set_text_fails_returns_false(self, mock_set, mock_get, mock_has, app):
-        """set_text が失敗した場合は False を返す"""
+        """set_text が失敗した場合は False を返す（元のテキストを復元する）"""
         app.config.enabled = True
 
         result = app._on_paste_detected()
@@ -285,7 +285,10 @@ class TestOnPasteDetected:
         assert result is False
         mock_has.assert_called_once()
         mock_get.assert_called_once()
-        mock_set.assert_called_once_with("変換後テキスト")
+        # set_text は2回呼ばれる：1回目は変換後テキスト、2回目は復元用の元テキスト
+        assert mock_set.call_count == 2
+        mock_set.assert_any_call("変換後テキスト")
+        mock_set.assert_any_call("変換前テキスト")
         app.hook.simulate_paste.assert_not_called()
 
     @patch("main.NOTIFICATION_AVAILABLE", True)

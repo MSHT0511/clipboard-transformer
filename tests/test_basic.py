@@ -281,3 +281,26 @@ class TestTransformerLoadRules:
         assert len(transformer.rules) == 2
         assert transformer.rules[0].name == "valid-before"
         assert transformer.rules[1].name == "valid-after"
+
+    def test_load_rules_returns_invalid_regex_list(self):
+        """無効な正規表現ルールのリストを返す"""
+        transformer = Transformer()
+
+        rules_config = [
+            {"name": "valid-literal", "type": "literal", "from": "a", "to": "b"},
+            {"name": "valid-regex", "type": "regex", "pattern": r"\d+", "replacement": "X"},
+            {"name": "invalid-regex-1", "type": "regex", "pattern": r"(unclosed", "replacement": "Y"},
+            {"name": "invalid-regex-2", "type": "regex", "pattern": r"(?P<", "replacement": "Z"},
+        ]
+
+        invalid_rules = transformer.load_rules_from_config(rules_config)
+
+        # 無効な正規表現ルールの名前が返される
+        assert len(invalid_rules) == 2
+        assert "invalid-regex-1" in invalid_rules
+        assert "invalid-regex-2" in invalid_rules
+        # 有効なルールは含まれない
+        assert "valid-literal" not in invalid_rules
+        assert "valid-regex" not in invalid_rules
+        # ルール自体は全て読み込まれる（compiled_patternがNoneになるだけ）
+        assert len(transformer.rules) == 4
