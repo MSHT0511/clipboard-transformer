@@ -130,6 +130,15 @@ class TestSetText:
         assert mock_sleep.call_count == 2
         mock_sleep.assert_called_with(0.05)
 
+    @patch("clipboard_util.win32clipboard")
+    def test_set_text_with_zero_retry_count(self, mock_clipboard):
+        """retry_count=0 の場合、forループに入らず直接 False を返す"""
+        result = clipboard_util.set_text("test", retry_count=0)
+
+        # forループに入らないので、OpenClipboard は呼ばれない
+        assert result is False
+        mock_clipboard.OpenClipboard.assert_not_called()
+
 
 class TestHasText:
     """has_text() の単体テスト"""

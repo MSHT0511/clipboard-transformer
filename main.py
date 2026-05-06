@@ -32,7 +32,7 @@ try:
     from winotify import Notification, audio
 
     NOTIFICATION_AVAILABLE = True
-except ImportError:
+except ImportError:  # pragma: no cover
     NOTIFICATION_AVAILABLE = False
     logger = logging.getLogger(__name__)
     logger.warning("winotify not available, notifications will be disabled")

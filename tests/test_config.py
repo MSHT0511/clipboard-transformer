@@ -426,3 +426,62 @@ class TestConfigEdgeCases:
             assert len(config.rules) == 2
         finally:
             os.unlink(temp_file)
+
+    def test_get_base_dir_when_frozen(self):
+        """PyInstaller でフリーズされた状態での get_base_dir()"""
+        from unittest.mock import patch
+
+        from config import get_base_dir
+
+        # sys.frozen = True の状態をモック
+        with patch("config.sys") as mock_sys:
+            mock_sys.frozen = True
+            mock_sys._MEIPASS = "/fake/meipass/directory"
+
+            result = get_base_dir()
+
+            # frozen 状態では _MEIPASS を返す
+            assert result == "/fake/meipass/directory"
+
+    def test_load_with_non_json_decode_exception(self):
+        """_load() で JSONDecodeError 以外の例外が発生した場合"""
+        from unittest.mock import patch
+
+        # os.path.exists を True を返すようにモック
+        # open() が RuntimeError を投げるようにパッチ
+        with (
+            patch("os.path.exists", return_value=True),
+            patch("builtins.open", side_effect=RuntimeError("Unexpected IO error")),
+        ):
+            config = Config("some_file.json")
+
+            # 一般例外でもデフォルト設定にフォールバック
+            assert config.enabled is True
+            assert config.rules == []
+
+    def test_validate_rules_with_non_dict_elements(self):
+        """rules 配列に dict でない要素が含まれる場合"""
+        config_data = {
+            "enabled": True,
+            "rules": [
+                {"name": "valid-rule", "type": "literal", "from": "a", "to": "b", "enabled": True},
+                "not_a_dict",  # 文字列
+                123,  # 整数
+                None,  # null
+                {"name": "another-valid", "type": "literal", "from": "x", "to": "y", "enabled": True},
+            ],
+        }
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as f:
+            json.dump(config_data, f)
+            temp_file = f.name
+
+        try:
+            config = Config(temp_file)
+
+            # dict でない要素はスキップされ、有効なルールのみ読み込まれる
+            assert len(config.rules) == 2
+            assert config.rules[0]["name"] == "valid-rule"
+            assert config.rules[1]["name"] == "another-valid"
+        finally:
+            os.unlink(temp_file)
