@@ -9,6 +9,8 @@ import logging
 import re
 import threading
 
+from constants import REGEX_TIMEOUT_SECONDS
+
 logger = logging.getLogger(__name__)
 
 # 定数
@@ -21,9 +23,6 @@ FIELD_FROM = "from"
 FIELD_TO = "to"
 FIELD_PATTERN = "pattern"
 FIELD_REPLACEMENT = "replacement"
-
-# ReDoS対策: 正規表現のタイムアウト（秒）
-REGEX_TIMEOUT = 2.0
 
 
 class TransformationRule:
@@ -81,7 +80,7 @@ class RegexRule(TransformationRule):
 
             worker = threading.Thread(target=regex_worker, daemon=True)
             worker.start()
-            worker.join(timeout=REGEX_TIMEOUT)
+            worker.join(timeout=REGEX_TIMEOUT_SECONDS)
 
             if worker.is_alive():
                 # タイムアウト発生
