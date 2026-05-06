@@ -257,3 +257,27 @@ class TestTransformerLoadRules:
         assert len(transformer.rules) == 1
         # 空のパターンは無効なので compiled_pattern は None かもしれない
         # または空文字列にマッチするパターンとして扱われる
+
+    def test_load_rule_with_unexpected_exception(self):
+        """_create_rule_from_config で予期しない例外が発生した場合"""
+        from unittest.mock import Mock
+
+        transformer = Transformer()
+
+        # .get() が例外を投げる異常なオブジェクト
+        bad_rule_config = Mock()
+        bad_rule_config.get.side_effect = RuntimeError("Unexpected error during get()")
+
+        rules_config = [
+            {"name": "valid-before", "type": "literal", "from": "a", "to": "b", "enabled": True},
+            bad_rule_config,  # これが例外を投げる
+            {"name": "valid-after", "type": "literal", "from": "x", "to": "y", "enabled": True},
+        ]
+
+        # 例外が発生してもクラッシュせず、他のルールは読み込まれる
+        transformer.load_rules_from_config(rules_config)
+
+        # bad_rule_config はスキップされ、前後の有効なルールのみ読み込まれる
+        assert len(transformer.rules) == 2
+        assert transformer.rules[0].name == "valid-before"
+        assert transformer.rules[1].name == "valid-after"

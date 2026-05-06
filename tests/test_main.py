@@ -609,6 +609,21 @@ class TestPlayPreviewSound:
         # MessageBeep が呼ばれた
         mock_beep.assert_called_once()
 
+    @patch("main.KeyboardHook")
+    @patch("main.winsound.MessageBeep")
+    @patch("main.winreg.OpenKey")
+    def test_play_preview_sound_general_exception(self, mock_open, mock_beep, mock_hook_class):
+        """予期しない例外が発生した場合、MessageBeepを再生"""
+        app = ClipboardTransformerApp()
+
+        # 一般的な例外（OSError でない）
+        mock_open.side_effect = RuntimeError("Unexpected error")
+
+        app._play_preview_sound("SomeSound")
+
+        # 例外が発生してもクラッシュせず、MessageBeep が呼ばれた
+        mock_beep.assert_called_once()
+
 
 class TestGetMenuItems:
     """_get_menu_items() のテスト"""
@@ -688,37 +703,148 @@ class TestRun:
 class TestMainFunction:
     """main() 関数のテスト"""
 
+    @patch("main.win32api.CloseHandle")
+    @patch("main.win32api.GetLastError")
+    @patch("main.win32event.CreateMutex")
     @patch("main.ClipboardTransformerApp")
-    def test_main_runs_app(self, mock_app_class):
+    def test_main_runs_app(self, mock_app_class, mock_create_mutex, mock_get_last_error, mock_close_handle):
         """main() がアプリケーションを起動"""
         mock_app = Mock()
         mock_app_class.return_value = mock_app
+
+        # ミューテックス作成成功
+        mock_mutex = Mock()
+        mock_create_mutex.return_value = mock_mutex
+        mock_get_last_error.return_value = 0
 
         main()
 
         mock_app_class.assert_called_once()
         mock_app.run.assert_called_once()
+        mock_close_handle.assert_called_once_with(mock_mutex)
 
+    @patch("main.win32api.CloseHandle")
+    @patch("main.win32api.GetLastError")
+    @patch("main.win32event.CreateMutex")
     @patch("main.ClipboardTransformerApp")
     @patch("main.sys.exit")
-    def test_main_handles_keyboard_interrupt(self, mock_exit, mock_app_class):
+    def test_main_handles_keyboard_interrupt(
+        self, mock_exit, mock_app_class, mock_create_mutex, mock_get_last_error, mock_close_handle
+    ):
         """Ctrl+C でクリーンに終了"""
+        # sys.exit() が SystemExit を投げるようにする
+        mock_exit.side_effect = lambda code: (_ for _ in ()).throw(SystemExit(code))
+
         mock_app = Mock()
         mock_app.run.side_effect = KeyboardInterrupt()
         mock_app_class.return_value = mock_app
 
-        main()
+        # ミューテックス作成成功
+        mock_mutex = Mock()
+        mock_create_mutex.return_value = mock_mutex
+        mock_get_last_error.return_value = 0
+
+        # SystemExit(0) が発生することを確認
+        try:
+            main()
+            raise AssertionError("Expected SystemExit to be raised")
+        except SystemExit as e:
+            assert e.code == 0
 
         mock_exit.assert_called_once_with(0)
+        mock_close_handle.assert_called_once_with(mock_mutex)
 
+    @patch("main.win32api.CloseHandle")
+    @patch("main.win32api.GetLastError")
+    @patch("main.win32event.CreateMutex")
     @patch("main.ClipboardTransformerApp")
     @patch("main.sys.exit")
-    def test_main_handles_exception(self, mock_exit, mock_app_class):
+    def test_main_handles_exception(
+        self, mock_exit, mock_app_class, mock_create_mutex, mock_get_last_error, mock_close_handle
+    ):
         """エラー発生時は exit(1)"""
+        # sys.exit() が SystemExit を投げるようにする
+        mock_exit.side_effect = lambda code: (_ for _ in ()).throw(SystemExit(code))
+
         mock_app = Mock()
         mock_app.run.side_effect = Exception("Test error")
         mock_app_class.return_value = mock_app
 
-        main()
+        # ミューテックス作成成功
+        mock_mutex = Mock()
+        mock_create_mutex.return_value = mock_mutex
+        mock_get_last_error.return_value = 0
+
+        # SystemExit(1) が発生することを確認
+        try:
+            main()
+            raise AssertionError("Expected SystemExit to be raised")
+        except SystemExit as e:
+            assert e.code == 1
 
         mock_exit.assert_called_once_with(1)
+        mock_close_handle.assert_called_once_with(mock_mutex)
+
+    @patch("main.win32api.CloseHandle")
+    @patch("main.win32api.GetLastError")
+    @patch("main.win32event.CreateMutex")
+    @patch("main.ClipboardTransformerApp")
+    def test_main_with_mutex_creation(self, mock_app_class, mock_create_mutex, mock_get_last_error, mock_close_handle):
+        """ミューテックスが正常に作成され、アプリが起動する"""
+        mock_app = Mock()
+        mock_app_class.return_value = mock_app
+
+        # ミューテックス作成成功（ERROR_ALREADY_EXISTS ではない）
+        mock_mutex = Mock()
+        mock_create_mutex.return_value = mock_mutex
+        mock_get_last_error.return_value = 0
+
+        main()
+
+        # アプリが起動された
+        mock_app_class.assert_called_once()
+        mock_app.run.assert_called_once()
+
+        # ミューテックスが解放された
+        mock_close_handle.assert_called_once_with(mock_mutex)
+
+    @patch("main.win32api.CloseHandle")
+    @patch("main.ctypes.windll.user32.MessageBoxW")
+    @patch("main.sys.exit")
+    @patch("main.win32api.GetLastError")
+    @patch("main.win32event.CreateMutex")
+    @patch("main.ClipboardTransformerApp")
+    def test_main_duplicate_instance(
+        self, mock_app_class, mock_create_mutex, mock_get_last_error, mock_exit, mock_message_box, mock_close_handle
+    ):
+        """既にアプリが起動している場合、メッセージボックスを表示して終了"""
+        import winerror
+
+        # sys.exit(1) が SystemExit を投げるようにする
+        mock_exit.side_effect = lambda code: (_ for _ in ()).throw(SystemExit(code))
+
+        # ミューテックスは作成されるが、既に存在する
+        mock_mutex = Mock()
+        mock_create_mutex.return_value = mock_mutex
+        mock_get_last_error.return_value = winerror.ERROR_ALREADY_EXISTS
+
+        # SystemExit が発生することを確認
+        try:
+            main()
+            raise AssertionError("Expected SystemExit to be raised")
+        except SystemExit as e:
+            assert e.code == 1
+
+        # アプリは起動されない
+        mock_app_class.assert_not_called()
+
+        # メッセージボックスが表示された
+        mock_message_box.assert_called_once()
+        call_args = mock_message_box.call_args[0]
+        assert "既に起動しています" in call_args[1]
+
+        # exit(1) で終了
+        mock_exit.assert_called_once_with(1)
+
+        # ミューテックスは解放される
+        mock_close_handle.assert_called_once_with(mock_mutex)
